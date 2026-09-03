@@ -172,7 +172,7 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | --- | --- | --- | --- | --- |
 | `ai-host-builder` | ollama-01 (`192.168.0.10`) | `builder` `builder-backend` `builder-frontend` | Gradle build/test, Next.js install/build | 기동 중 — **`builder-frontend` 라벨 추가 필요** |
 | `backend-dev-agent` | main-server (`192.168.0.11`) | `deploy-backend-dev` | 백엔드 dev compose 배포 | 기동 중 |
-| `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | **미기동 — 컨테이너 추가 필요** |
+| `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
 | `backend-prod-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-prod` | 백엔드 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
 | `frontend-prod-agent` | backend-1 (`192.168.0.13`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
 
@@ -196,6 +196,16 @@ sh install-jenkins-agent.sh .env.frontend-dev
 ```
 
 env 파일마다 `JENKINS_DEPLOY_AGENT_NAME` / `_PROJECT_NAME` / `_CONTAINER_NAME` / `_WORKDIR` 를 서로 다르게 둬야 컨테이너와 작업 디렉터리가 충돌하지 않습니다.
+
+**혼디가개(hondigagae) 잡은 이 agent 들을 그대로 공유합니다.** 새 agent 를 띄우지 않고 멀티브랜치 잡
+`hondigagae-{service-discovery,api-gateway,auth-service,tour-service,plan-service,ai-service,batch-service}` 와
+`hondigagae-frontend-web` 을 만들 때 노드 라벨은 BossPickSeoul 과 같게 두고, credential 만
+`hondigagae-vault-role-id` / `hondigagae-vault-secret-id` 로 바꿉니다 (`vault/README.md` 혼디가개 절).
+배포 lock 은 `hondigagae-backend-deploy` / `hondigagae-frontend-deploy` 로 분리되어 BossPickSeoul 배포와 서로 막지 않습니다.
+
+deploy agent 컨테이너 안의 `$HOME` 은 `/home/jenkins` 입니다. 파이프라인이 만드는 배포 디렉터리는 그 안에 생기지만,
+compose 의 **바인드 마운트**(혼디가개 batch 의 `BATCH_DATA_DIR` 등)는 `/var/run/docker.sock` 을 통해 호스트 데몬이
+해석하므로 Vault 에는 **호스트 경로**를 적어야 합니다.
 
 > **아키텍처 주의** — 빌더가 도는 ollama-01 은 x86_64(Ryzen 7 8845HS)이고, 배포 대상 main-server / backend-1 / storage 는 모두 aarch64 입니다. 백엔드는 JAR 이라 무관하지만, 프론트는 빌더에서 만든 `.next/standalone` 을 arm64 호스트에서 실행합니다. 현재 프론트 의존성에는 네이티브 모듈이 없어 문제가 없고, 파이프라인이 번들에 `*.node` 바이너리가 섞이면 빌드를 UNSTABLE 로 표시해 알려줍니다. 그 경고가 뜨면 `builder-frontend` 라벨을 arm64 노드로 옮겨야 합니다.
 

@@ -697,13 +697,93 @@ root 기본값은 backend 잡이 `kv/hondigagae/backend`, frontend 잡이 `kv/ho
 
 key 목록의 단일 기준은 애플리케이션 레포의 `backend/.env.example` 과 `frontend/.env.example` 입니다.
 
-### 저장 예시
+### 저장 방법 — 키별로 넣는다
+
+파이프라인은 secret 의 `data.data` 를 **키별 평면 맵**으로 읽어 `.env.runtime` 을 만듭니다.
+줄바꿈이 든 값은 거부합니다. 그래서 `.env` 파일 전체를 `env_file` 한 키에 넣는 방식
+(`vault kv put ... env_file=@.env`)은 **저장은 되지만 배포 단계에서 실패**합니다.
+BossPickSeoul 과 같은 방식으로 키 하나에 값 하나씩 넣습니다.
+
+가장 쉬운 방법은 Web UI 입니다. `kv/hondigagae/backend/dev/env` 를 만들 때 **JSON 토글**을 켜고
+`{"KEY": "value", ...}` 를 통째로 붙여 넣습니다. BossPickSeoul secret 을 열어 JSON 으로 복사한 뒤
+키 이름은 그대로 두고 값만 바꾸는 것이 제일 빠릅니다 (아래 키 표 참고).
+
+CLI 로 넣을 때는 `.env` 를 KEY=VALUE 인자로 풀어서 넘깁니다.
 
 ```bash
-# 애플리케이션 레포에서 .env.example 을 복사해 값을 채운 뒤
-docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env env_file=@backend/.env
+# 애플리케이션 레포에서 .env.example 을 .env 로 복사해 <...> 를 채운 뒤 (주석·빈 줄 제외)
+docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env \
+  $(grep -Ev '^\s*(#|$)' backend/.env | xargs)
 docker exec -it vault vault kv get -mount="kv" hondigagae/backend/dev/env
 ```
+
+`kv put` 은 secret 전체를 **덮어씁니다.** 키 하나만 바꾸려면 `vault kv patch` 를 씁니다.
+
+### 프론트 secret 에 넣을 key — `kv/hondigagae/frontend/{env}/env`
+
+**키 이름은 BossPickSeoul 프론트 secret 과 같습니다.** 두 프로젝트를 나란히 관리하므로 갈라 두지
+않습니다. 차이는 `NEXT_PUBLIC_WS_URL` 이 없다는 것 하나입니다 (WebSocket 미사용 — 들어 있어도 무해).
+
+| key | 시점 | dev 값 | prod 값 |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SITE_URL` | 빌드 | `https://dev.hondigagae.com` | `https://www.hondigagae.com` |
+| `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY` | 빌드 | 혼디가개 카카오 앱의 JavaScript 키 | 〃 (같은 앱, 도메인만 추가 등록) |
+| `AUTH_SESSION_SECRET` | 빌드 + 런타임 | `openssl rand -base64 48` | dev 와 **다른** 값 |
+| `BACKEND_API_URL` | 빌드 + 런타임 | `https://api-dev.hondigagae.com` | `https://api.hondigagae.com` |
+| `TIME_ZONE` | 런타임 | `Asia/Seoul` | `Asia/Seoul` |
+| `FRONTEND_WEB_PORT` | 런타임 | `7300` | `5300` |
+| `FRONTEND_WEB_MEM_LIMIT` | 런타임 | `512m` | `768m` |
+
+- `AUTH_SESSION_SECRET` 과 `BACKEND_API_URL` 은 `NEXT_PUBLIC_` 이 아닌데도 **빌드에도 필요**합니다.
+  `src/lib/env.server.ts` 가 모듈 로드 시점에 zod 로 fail-fast 하기 때문입니다.
+- 카카오 앱은 **BossPickSeoul 앱을 공유하지 않습니다.** 도메인(`dev.hondigagae.com`, `www.hondigagae.com`)이
+  다르므로 혼디가개용 앱을 만들고 그 JavaScript 키 / REST API 키를 씁니다.
+- `AUTH_SESSION_SECRET` 은 환경당 한 번만 만들고 고정합니다. 바뀌면 전원 로그아웃됩니다.
+
+### 백엔드 secret 에 넣을 key — `kv/hondigagae/backend/{env}/env`
+
+전체 목록(137개)의 단일 기준은 애플리케이션 레포 `backend/.env.example` 이고, 상수 성격의 키
+(포트표, `*_APP_NAME`, 임계값, TTL, 공공데이터 base URL)는 그 파일의 값을 그대로 넣습니다.
+사람이 **채우거나 환경마다 다르게 넣어야 하는 키**만 아래에 모았습니다.
+
+#### 발급·생성해야 하는 비밀값
+
+| key | 어디서 | 비고 |
+| --- | --- | --- |
+| `JASYPT_ENCRYPTOR_KEY` | `openssl rand -base64 32` | 비면 빌드 단계에서 중단 |
+| `DB_PASSWORD` | MySQL `hondigagae` 계정 생성 시 정한 값 | `DB_USERNAME=hondigagae` |
+| `REDIS_PASSWORD` | main-server `redis-node1` requirepass | **BossPickSeoul dev 와 같은 값** (같은 Redis) |
+| `JWT_ACCESS_KEY` / `JWT_REFRESH_KEY` | `openssl rand -base64 64 \| tr -d '\n'` | BossPickSeoul 과 **다른 값**. 같은 Redis 를 쓰므로 키가 같으면 토큰이 서로 통과한다 |
+| `OAUTH_KAKAO_CLIENT_ID` / `_SECRET` | 혼디가개 카카오 앱 (REST API 키 / Client Secret) | 프론트 secret 의 JavaScript 키와 같은 앱 |
+| `OAUTH_NAVER_CLIENT_ID` / `_SECRET` | 네이버 개발자센터 | 아직 안 쓰면 빈 값 |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | Gmail 계정 / 앱 비밀번호 | BossPickSeoul 과 공용 가능 |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | storage MinIO | BossPickSeoul 과 같은 MinIO. 버킷 `hondigagae` 는 따로 만든다 |
+| `TOUR_API_SERVICE_KEY` / `KMA_API_SERVICE_KEY` | data.go.kr 디코딩(원문) 키 | 한 키로 둘 다 가능. 기상특보는 별도 활용신청 |
+| `VWORLD_API_KEY` | vworld.kr | 비면 음식점이 좌표 없이 적재 |
+| `AI_LLM_API_KEY` | — | Ollama 는 키가 없다. 빈 값 |
+
+#### 환경(dev / prod)마다 값이 다른 키
+
+| key | dev | prod |
+| --- | --- | --- |
+| `SPRING_PROFILES_ACTIVE` | `dev` | `prod` (dev 로 두면 운영 스키마가 배포마다 자동 변경된다) |
+| `SERVICE_DISCOVERY_HOSTNAME` | `hondigagae-service-discovery-dev` | `hondigagae-service-discovery-prod` |
+| `*_APP_NAME` 7개 | `{service}-dev` | `{service}-prod` |
+| `AUTH_DB_URL` / `TOUR_DB_URL` / `PLAN_DB_URL` / `BATCH_DB_URL` | main-server MySQL, `hondigagae_{auth,tour,plan}_dev` (batch 는 tour) | 운영 MySQL, `hondigagae_{...}_prod` |
+| `REDIS_KEY_PREFIX` | `hondigagae:dev` | `hondigagae:prod` |
+| `REDIS_MODE` / `REDIS_HOST` | `standalone` / main-server Redis (BossPickSeoul dev 와 동일) | 운영 Redis 구성에 맞춤 |
+| `OAUTH_KAKAO_REDIRECT_URI` | `https://dev.hondigagae.com/oauth/kakao/callback` | `https://www.hondigagae.com/oauth/kakao/callback` |
+| `OAUTH_NAVER_REDIRECT_URI` | `https://dev.hondigagae.com/oauth/naver/callback` | `https://www.hondigagae.com/oauth/naver/callback` |
+| `BATCH_DATA_DIR` | `/home/<main-server 계정>/deploy/hondigagae/backend/data` | backend-1 의 호스트 경로 |
+| `JWT_*_KEY`, `JASYPT_ENCRYPTOR_KEY`, `DB_PASSWORD` | dev 값 | dev 와 **다른** 값 |
+
+`REDIS_MASTER_NAME` / `REDIS_SENTINEL_NODES` 는 standalone 이면 빈 값으로 둡니다. sentinel 로 바꿀 때만 채웁니다.
+
+#### 공통 인프라 값 (BossPickSeoul dev secret 과 같다)
+
+`REDIS_HOST`, `REDIS_PORT`, `MINIO_ENDPOINT`, `MINIO_PUBLIC_URL`, `MAIL_HOST`, `MAIL_PORT`,
+`AI_LLM_BASE_URL`, `AI_LLM_PROVIDER`, `AI_LLM_MODEL` 은 같은 인프라를 가리키므로 BossPickSeoul dev secret 의
+값을 그대로 복사합니다. `MINIO_BUCKET` 만 `hondigagae` 입니다.
 
 ### 포트 키에 주의
 
