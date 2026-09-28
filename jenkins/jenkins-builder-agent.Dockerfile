@@ -48,4 +48,7 @@ RUN apt-get update \
 COPY docker-entrypoint-jenkins-agent.sh /usr/local/bin/docker-entrypoint-jenkins-agent.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint-jenkins-agent.sh
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint-jenkins-agent.sh"]
+# tini 를 PID 1 로 둡니다. entrypoint 가 jenkins-agent(java) 로 exec 하므로, tini 가 없으면
+# java 가 PID 1 이 되어 빌드가 남긴 고아 프로세스를 거두지 않습니다. 좀비가 쌓여 pids.max 에
+# 닿으면 git 조차 띄우지 못하고 checkout 이 "unable to create native thread" 로 실패합니다.
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint-jenkins-agent.sh"]

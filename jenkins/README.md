@@ -275,3 +275,35 @@ Docker socket 권한 확인:
 docker exec jenkins-builder-agent id
 docker exec jenkins-builder-agent docker ps
 ```
+
+PID 1 과 프로세스 수 확인:
+
+```bash
+docker exec jenkins-builder-agent cat /proc/1/comm        # tini 여야 합니다
+docker stats --no-stream jenkins-builder-agent            # PIDS 가 수만 단위로 늘어 있으면 누수
+docker exec jenkins-builder-agent sh -c 'cat /sys/fs/cgroup/pids.max /sys/fs/cgroup/pids.current'
+```
+
+## 장애 기록
+
+### checkout 이 `.git` 손상 + `unable to create native thread` 로 실패 (2026-09-28)
+
+증상: 모든 잡이 `checkout scm` 에서 `Workspace has a .git repository, but it appears to be corrupt`
+와 `java.lang.OutOfMemoryError: unable to create native thread` 로 실패합니다.
+`.git` 은 멀쩡합니다. git 프로세스를 띄우지 못해 Jenkins 가 손상으로 오판한 것입니다.
+
+원인: agent 이미지에 `tini` 가 설치돼 있었지만 `ENTRYPOINT` 에서 쓰지 않았습니다. entrypoint 가
+`jenkins-agent`(java) 로 `exec` 하므로 java 가 PID 1 이 되었고, 빌드가 남긴 고아 프로세스를
+아무도 거두지 않았습니다. 3개월 무중단 운영 끝에 `pids.current 37586 / pids.max 37590` 에 닿았습니다.
+메모리는 여유가 있었습니다(에이전트 1.7GiB, 호스트 available 23GiB).
+
+조치: 두 agent Dockerfile 의 `ENTRYPOINT` 를 controller 와 같이 `/usr/bin/tini --` 로 감쌌습니다.
+이미지를 다시 빌드해야 반영됩니다.
+
+```bash
+# 진행 중인 빌드가 없는지 Jenkins UI 에서 확인한 뒤
+sh install-jenkins-builder.sh    # = compose up -d --build
+docker exec jenkins-builder-agent cat /proc/1/comm   # tini
+```
+
+deploy agent 도 각 서버에서 같은 방식으로 다시 빌드합니다.

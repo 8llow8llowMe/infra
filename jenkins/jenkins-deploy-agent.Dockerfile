@@ -40,4 +40,5 @@ RUN apt-get update \
 COPY docker-entrypoint-jenkins-agent.sh /usr/local/bin/docker-entrypoint-jenkins-agent.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint-jenkins-agent.sh
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint-jenkins-agent.sh"]
+# builder agent 와 같은 이유로 tini 를 PID 1 로 둡니다 (jenkins-builder-agent.Dockerfile 참고).
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint-jenkins-agent.sh"]
