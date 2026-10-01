@@ -2,6 +2,8 @@
 
 이 디렉터리는 미니PC `ai-host`에서 Ollama와 Open WebUI를 Docker Compose로 운영하기 위한 구성입니다.
 
+Jenkins·Kafka와 공유하는 호스트의 자원 상한, 장애 진단, UMA 조정 절차는 [HOST-STABILITY.md](HOST-STABILITY.md)를 참고합니다.
+
 장비는 Ryzen 7 8845HS + Radeon 780M + RAM 32GB 입니다. **Radeon 780M(gfx1103)은 ROCm 공식 지원 대상이 아니므로 Vulkan 백엔드(Mesa RADV 경유)로 iGPU 가속**을 사용합니다. 이미지는 베이스 `ollama/ollama:latest` 그대로 쓰며, `OLLAMA_VULKAN=1` 환경변수로 컴파일되어 있는 Vulkan 런타임을 opt-in 합니다.
 
 ## 구성 요약
@@ -18,6 +20,7 @@ ollama/
 ├── docker-compose-ollama.yml
 ├── install-ollama.sh
 ├── pull-model.sh
+├── benchmark-api.py
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -44,8 +47,13 @@ Compose 파일에는 기본값을 넣지 않습니다. 실행 전에 `.env`를 �
 | `OLLAMA_PORT` | Ollama 외부 포트 | `11434` |
 | `OLLAMA_CONTAINER_PORT` | Ollama 컨테이너 포트 | `11434` |
 | `OLLAMA_HOST` | Ollama listen 주소 | `0.0.0.0:11434` |
-| `OLLAMA_KEEP_ALIVE` | 모델 메모리 유지 시간 | `24h` |
+| `OLLAMA_KEEP_ALIVE` | API 모델 메모리 유지 시간 | `5h` |
 | `OLLAMA_NUM_PARALLEL` | 동시 추론 수 | `1` |
+| `OLLAMA_MAX_LOADED_MODELS` | 동시 로드 모델 수 | `1` |
+| `OLLAMA_CONTEXT_LENGTH` | 기본 컨텍스트 길이 | `4096` |
+| `OLLAMA_MAX_QUEUE` | 대기 요청 상한 | `16` |
+| `OLLAMA_MEM_LIMIT` / `OLLAMA_CPUS` | Ollama 컨테이너 상한 (`MemTotal >= 29Gi` 전제) | `17g` / `8.0` |
+| `OPEN_WEBUI_MEM_LIMIT` | Open WebUI 메모리 상한 | `1g` |
 | `OLLAMA_VULKAN` | Vulkan 백엔드 활성화 | `1` |
 | `OLLAMA_IGPU_ENABLE` | 내장 GPU 사용 허용 (0.32+ 필수, 없으면 CPU 폴백) | `1` |
 | `OLLAMA_FLASH_ATTENTION` | flash attention 활성화 (KV 캐시 양자화 전제 조건) | `1` |
@@ -75,7 +83,7 @@ SearXNG 를 붙여 웹 검색을 사용하려면 [README-SEARXNG.md](README-SEAR
 
 ## 사전 준비 (호스트)
 
-1. BIOS Advanced → **UMA Frame Buffer Size = 8G** 로 설정 후 재부팅 (Radeon 780M 전용 메모리 8GB 확보)
+1. BIOS UMA 설정값과 실제 적용값을 구분합니다. `free -h`의 `MemTotal`, `/sys/class/drm/card*/device/mem_info_vram_total`, 모델 로드 시 `ollama ps`를 기록합니다. API 모델 `gpt-oss:20b`는 약 14GB이므로 UMA Auto/2GB 변경은 같은 요청의 성능 비교 후 결정합니다.
 2. 호스트에 amdgpu 드라이버와 Mesa Vulkan 드라이버 설치 확인:
    ```bash
    ls /dev/dri          # card0, renderD128 이 보여야 함
@@ -173,53 +181,40 @@ http://ollama:11434
 
 ## 모델 설치
 
-권장 시작 모델 (8GB UMA 안에 들어가는 7B/8B Q4):
+API에서 사용하는 모델:
 
 ```bash
-sh pull-model.sh qwen2.5-coder:7b
-sh pull-model.sh llama3.1:8b
-sh pull-model.sh mistral:7b
+sh pull-model.sh gpt-oss:20b
 ```
 
 직접 실행:
 
 ```bash
-docker exec -it ollama ollama pull qwen2.5-coder:7b
-docker exec -it ollama ollama run qwen2.5-coder:7b
+docker exec -it ollama ollama pull gpt-oss:20b
+docker exec -it ollama ollama run gpt-oss:20b
 ```
 
 ## iGPU 메모리 (UMA + GTT)
 
 Radeon 780M 은 dGPU 처럼 별도 VRAM 이 없고 시스템 RAM 을 나눠 씁니다.
 
-- **UMA Frame Buffer** — BIOS 에서 미리 떼어 GPU 전용으로 고정하는 영역. 부팅 시 차감되어 OS 에 비가시. ollama-01 은 `8G` 로 설정합니다.
-- **GTT (Graphics Translation Table)** — UMA 가 부족할 때 amdgpu 드라이버가 남은 시스템 RAM 의 약 절반까지 동적으로 GPU 메모리로 매핑하는 영역. 동작은 하지만 메모리 대역폭 경합으로 추론 속도가 떨어집니다.
+- **UMA Frame Buffer** — BIOS 에서 미리 떼어 GPU 전용으로 고정하는 영역. 현재 실제 적용 크기는 호스트의 `mem_info_vram_total`로 확인해야 합니다.
+- **GTT (Graphics Translation Table)** — GPU 가 접근할 수 있는 시스템 RAM 영역입니다. 사용 가능 크기와 Ollama의 모델 배치는 드라이버·BIOS·모델에 따라 달라집니다.
 
-ollama-01 메모리 배분:
+RAM 32GB는 보통 `free -h`에서 약 `30Gi`로 보입니다(GB와 GiB 단위 차이). 과거 인벤토리의 `30Gi`만으로 BIOS UMA 예약량이 2GB라고 계산할 수 없습니다. `gpt-oss:20b`의 파일 크기는 약 14GB이며 실행 메모리는 더 필요합니다. UMA 8GB만으로 모델 전체가 고정 GPU 영역에 들어가지는 않습니다. 고정 UMA를 줄여도 활성 모델이 GTT를 사용하면 시스템 메모리 소비가 다시 늘어납니다.
 
-```text
-총 RAM:         32GB
-└─ UMA:          8GB  (GPU 전용, BIOS 에서 차감)
-└─ 시스템:      24GB  (OS + Jenkins + Vault + MinIO + Open WebUI + ...)
-└─ GTT 가능:   ~12GB  (시스템 RAM 중 GPU 가 동적으로 빌려쓰는 한도)
-```
+여러 프로젝트의 API가 공유하는 `gpt-oss:20b`의 재로딩을 줄이기 위해 `OLLAMA_KEEP_ALIVE=5h`로 모델을 유지하고, `MAX_LOADED_MODELS=1`, `NUM_PARALLEL=1`, `CONTEXT_LENGTH=4096`으로 동시 메모리 급증을 억제합니다. 5시간 설정은 유휴 모델의 유지 시간만 늘리며, 모델이 이미 메모리에 있을 때의 생성 속도를 높이지는 않습니다. 클라이언트의 `keep_alive`와 `num_ctx`는 서버 기본값을 덮어쓸 수 있습니다. UMA 변경 판단과 요청 단계별 속도 측정은 [HOST-STABILITY.md](HOST-STABILITY.md)를 따릅니다.
 
-실효 GPU 가용 메모리는 UMA + GTT ≈ 16~18GB 가 한도지만, **GTT 로 흘러가면 토큰/초가 눈에 띄게 떨어집니다.** 모델 선택 가이드:
-
-- **권장**: 8GB UMA 안에 풀로 들어가는 Q4_K_M 7B / 8B (qwen2.5-coder:7b, llama3.1:8b, mistral:7b)
-- **가능 (느림)**: 13B Q4 — GTT spill 로 동작, 응답 지연 감수
-- **비추천**: 14B 이상 풀 정밀도, 30B 이상 — 호스트 OOM 위험
-
-`OLLAMA_KEEP_ALIVE=24h` + `OLLAMA_NUM_PARALLEL=1` 은 UMA 에 모델을 상주시켜 재로드를 줄이는 설정이므로 그대로 둡니다.
+`OLLAMA_MAX_QUEUE=16`은 대기열이 지나치게 길어지는 것을 막습니다. 동시 요청이 많으면 초과 요청은 503으로 거절될 수 있으므로 API 호출 측에서 재시도 정책과 동시 요청 수를 맞춥니다.
 
 ## 운영 주의사항
 
 - `ollama-data/`, `open-webui-data/`, `.env`는 Git 에 커밋하지 않습니다.
 - 모델 파일은 용량이 크므로 SSD 여유 공간을 주기적으로 확인합니다.
-- `OLLAMA_NUM_PARALLEL=1` 로 시작하고, 여유가 확인되면 2 이상을 테스트합니다.
+- `gpt-oss:20b`를 쓰는 동안 `OLLAMA_NUM_PARALLEL=1`을 유지합니다. 병렬 요청은 KV 캐시 메모리를 늘립니다.
 - API 포트 `11434` 는 공개망에 직접 노출하지 않습니다.
 - Open WebUI 를 외부에 열어야 한다면 Nginx TLS, 인증, IP allowlist 를 먼저 구성합니다.
-- UMA 8GB 로 줄이면 시스템 RAM 이 24GB 로 떨어집니다. Jenkins/Vault/MinIO/Open WebUI 가 동시에 떠 있는 환경에서는 동시 로딩 모델 수와 KV cache 크기를 보수적으로 잡습니다.
+- Jenkins·Kafka·Vault·Open WebUI가 함께 떠 있으므로 실제 `MemTotal`과 모델 실행 중 `MemAvailable`을 측정한 뒤 컨테이너 상한을 적용합니다.
 - **Vulkan 초기화 실패 시 Ollama 는 조용히 CPU 로 폴백합니다.** 기동 직후 위 "GPU 인식 검증" 절차로 반드시 확인합니다.
 - `OLLAMA_VULKAN` 은 Ollama 업스트림에서 experimental 플래그로 표기되어 있습니다. 변경 가능성이 있으므로 운영 안정성이 필요해지면 이미지 핀(`ollama/ollama:0.X.Y`) 을 고려합니다.
 

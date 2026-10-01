@@ -7,6 +7,7 @@
 - `jenkins-deploy-agent`: Docker Compose 배포 전용 agent
 
 controller는 Jenkins UI에서 executor 수를 `0`으로 설정하고, 실제 작업은 label이 맞는 agent에서만 실행하는 것을 권장합니다.
+`ollama-01`의 builder executor는 `1`로 설정합니다. Ollama와 빌드가 겹칠 때의 자원 상한 및 적용 순서는 [ollama-01 안정화 가이드](../ollama/HOST-STABILITY.md)를 참고합니다.
 
 ## 권장 구성
 
@@ -96,7 +97,8 @@ controller 주요 값:
 | `JENKINS_CONTROLLER_IMAGE` | controller 이미지 이름 | `jenkins-controller:latest` |
 | `JENKINS_CONTROLLER_CONTAINER_NAME` | controller 컨테이너 이름 | `jenkins-controller` |
 | `JENKINS_CONTROLLER_HOME` | Jenkins home bind mount 경로 | `./jenkins-home` |
-| `JENKINS_CONTROLLER_JAVA_OPTS` | controller JVM 옵션 | `"-Xms512m -Xmx2048m -Duser.timezone=Asia/Seoul"` |
+| `JENKINS_CONTROLLER_JAVA_OPTS` | controller JVM 옵션 | `"-Xms256m -Xmx1536m -Duser.timezone=Asia/Seoul"` |
+| `JENKINS_CONTROLLER_MEM_LIMIT` / `JENKINS_CONTROLLER_CPUS` | controller 상한 | `2560m` / `2.0` |
 
 builder 주요 값:
 
@@ -109,6 +111,9 @@ builder 주요 값:
 | `JENKINS_BUILDER_IMAGE` | builder 이미지 이름 | `jenkins-builder-agent:latest` |
 | `JENKINS_BUILDER_CONTAINER_NAME` | builder 컨테이너 이름 | `jenkins-builder-agent` |
 | `JENKINS_BUILDER_WORKDIR` | builder 작업공간 | `./jenkins-builder-agent` |
+| `JENKINS_BUILDER_MEM_LIMIT` / `JENKINS_BUILDER_CPUS` | 20B API 동거 시 builder 상한 | `3g` / `4.0` |
+| `JENKINS_BUILDER_PIDS_LIMIT` | builder 프로세스 상한 | `1024` |
+| `JENKINS_BUILDER_GRADLE_OPTS` | Gradle worker와 daemon 제한 | `-Dorg.gradle.workers.max=2 -Dorg.gradle.daemon=false` |
 
 deploy 주요 값:
 

@@ -3,6 +3,9 @@ services:
     image: ${OLLAMA_IMAGE}
     container_name: ${OLLAMA_CONTAINER_NAME}
     restart: unless-stopped
+    mem_limit: ${OLLAMA_MEM_LIMIT:-17g}
+    memswap_limit: ${OLLAMA_MEM_LIMIT:-17g}
+    cpus: ${OLLAMA_CPUS:-8.0}
     # 호스트의 DRI 장치를 컨테이너에 전달해 Ollama가 AMD iGPU를 Vulkan으로 사용할 수 있게 합니다.
     # 컨테이너 안에서도 /dev/dri/renderD128 같은 GPU 렌더 장치가 보이게 됩니다.
     devices:
@@ -15,6 +18,9 @@ services:
       OLLAMA_HOST: ${OLLAMA_HOST}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-4096}
+      OLLAMA_MAX_QUEUE: ${OLLAMA_MAX_QUEUE:-16}
       OLLAMA_VULKAN: ${OLLAMA_VULKAN}
       # Ollama 0.32+부터 내장 GPU(iGPU)는 기본 제외된다. 이 플래그가 없으면
       # "dropping integrated GPU" 로그와 함께 CPU 추론으로 떨어진다.
@@ -40,6 +46,8 @@ services:
     image: ${OPEN_WEBUI_IMAGE}
     container_name: ${OPEN_WEBUI_CONTAINER_NAME}
     restart: unless-stopped
+    mem_limit: ${OPEN_WEBUI_MEM_LIMIT:-1g}
+    memswap_limit: ${OPEN_WEBUI_MEM_LIMIT:-1g}
     depends_on:
       - ollama
     environment:
