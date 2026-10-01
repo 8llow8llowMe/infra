@@ -865,3 +865,231 @@ docker exec -it \
 ```bash
 docker exec -it -e CONFIRM_RESET_KV=hondigagae vault sh /vault/scripts/reset-kv-hondigagae.sh
 ```
+
+## sneezecast Secret Path
+
+sneezecast 도 **같은 Vault 인스턴스와 같은 `kv` mount 를 공유**하고, policy / AppRole / 경로만 분리합니다.
+Vault 를 새로 띄우거나 다시 초기화할 필요가 없습니다.
+
+```text
+kv/sneezecast/backend/{env}/env                    # 공통 — 둘 이상의 서비스가 같은 값을 써야 하는 키
+kv/sneezecast/backend/{env}/api-gateway
+kv/sneezecast/backend/{env}/auth-service
+kv/sneezecast/backend/{env}/surveillance-service   # REPORTER_KEY_PEPPER 는 여기에만
+kv/sneezecast/backend/{env}/batch-service
+kv/sneezecast/frontend/{env}/env                   # 프론트가 생기면
+```
+
+`{env}` 는 `dev` / `prod` 입니다. service-discovery 는 공통 secret 만 읽으므로 서비스 경로가 없습니다.
+서비스 경로 이름은 파이프라인 설정의 `serviceName`(모듈 디렉터리 이름)과 같게 둡니다.
+
+### 혼디가개와 다른 점 — 공통 + 서비스별 두 층
+
+혼디가개는 환경당 secret 하나(`{env}/env`)에 전 서비스의 키를 모읍니다. sneezecast 는 그 `{env}/env` 를
+**공통 secret** 으로 그대로 쓰고, 한 서비스만 쓰는 키는 서비스 경로로 뺍니다.
+
+- **공통 키는 한 곳에만 둡니다.** `JWT_ACCESS_KEY` 는 게이트웨이 · auth · surveillance 가 같은 항목을 읽습니다.
+  서비스 경로에 복사본을 두지 않습니다 — 길이는 맞고 값만 다른 키가 들어가면 기동 검사는 통과하고 모든
+  토큰이 401 이 됩니다. `REDIS_*`, `SERVICE_DISCOVERY_*`, 게이트웨이가 라우팅에 쓰는 `*_SERVICE_APP_NAME` 도
+  같은 이유로 공통입니다. 혼디가개가 secret 을 하나로 모은 이유와 같습니다.
+- **서비스 전용 비밀은 그 서비스 경로에 둡니다.** 개인정보 경계 때문입니다. `REPORTER_KEY_PEPPER` 와 auth DB
+  계정이 한 `.env.runtime` 에 같이 있으면, 그 파일 하나로 회원(`memberId`)과 가명 보고(`reporter_key`)를
+  이을 수 있습니다. 앱 레포 `backend/docs/architecture-guide.md` §6 은 pepper 를 "surveillance 경로에만, auth 는
+  모른다" 로 정해 두었습니다. DB 계정 세 개(auth · surveillance · batch)를 나눈 것도 같은 경계입니다.
+- **같은 키를 두 경로에 넣지 않습니다.** 어느 값이 이기는지에 기대지 않습니다.
+
+#### 파이프라인 요구사항 (앱 레포 몫, 아직 없음)
+
+혼디가개 `Jenkinsfile.backend-common.groovy` 는 `{root}/{env}/env` **한 경로만** 읽습니다. sneezecast 잡은
+`{root}/{env}/env` 와 `{root}/{env}/{serviceName}` 을 읽어 합친 뒤 `.env.runtime` 을 만들어야 합니다.
+
+- 서비스 경로가 없으면(service-discovery) 공통만 씁니다.
+- 같은 키가 양쪽에 있으면 **실패**시킵니다 (덮어쓰지 않음).
+- 혼디가개 판을 그대로 복사하면 surveillance 는 pepper 가 없어 기동에 실패합니다(fail-fast, 조용히 돌지 않음).
+  또 혼디가개 판의 `requiredBuildEnvKeys()` 는 `JASYPT_ENCRYPTOR_KEY` 를 요구하는데, sneezecast yml 에는 그
+  자리표시자도 `ENC(...)` 값도 없습니다. 복사할 때 목록을 sneezecast 에 맞춥니다.
+
+#### 정책은 pepper 를 auth 쪽에서 막지 않는다
+
+`jenkins-sneezecast` · `backend-sneezecast` 정책은 혼디가개와 같이 `kv/data/sneezecast/backend/*` 전체를 읽습니다.
+서비스별로 나뉘지 않으므로 **Vault 만으로는 auth 잡이 pepper 를 읽는 것을 막지 못합니다.** 실제로 떼어 놓는
+것은 두 단계입니다.
+
+1. 파이프라인: 잡마다 공통 + 자기 서비스 경로만 읽는다 → auth 배포 디렉터리의 `.env.runtime` 에 pepper 가 없다.
+2. compose: auth compose 는 `REPORTER_KEY_PEPPER` 를 컨테이너에 넘기지 않는다.
+
+Vault 단에서도 막으려면 surveillance 잡 전용 AppRole(정책: `.../+/surveillance-service` 만 read)을 따로 두고
+`jenkins-sneezecast` 에 그 경로 `deny` 블록을 더해야 합니다. Jenkins credential 도 잡 단위로 범위를 좁혀야
+의미가 있습니다. 지금은 하지 않았습니다 — 운영자 수가 늘거나 감사 요구가 생기면 검토합니다.
+
+### 저장 방법 — 키별로 넣는다
+
+혼디가개와 같습니다. 파이프라인은 secret 의 `data.data` 를 **키별 평면 맵**으로 읽고 줄바꿈이 든 값을
+거부합니다. `env_file=@.env` 한 키 저장은 배포 단계에서 실패합니다.
+
+- Web UI: secret 을 만들 때 **JSON 토글**을 켜고 `{"KEY": "value", ...}` 를 붙여 넣습니다. 비밀값은 셸 이력에
+  남지 않도록 이 방법을 권합니다.
+- CLI: `kv put` 은 secret 전체를 **덮어씁니다.** 키 하나만 바꾸려면 `kv patch` 를 씁니다.
+
+```bash
+docker exec -it vault vault kv put -mount="kv" sneezecast/backend/dev/env \
+  SPRING_PROFILES_ACTIVE=dev REDIS_KEY_PREFIX=sneezecast:dev ...
+docker exec -it vault vault kv patch -mount="kv" sneezecast/backend/dev/auth-service AUTH_DB_PASSWORD=...
+docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
+```
+
+생성해야 하는 무작위 값 (환경마다 따로 만들고, BossPickSeoul · 혼디가개 값과도 다르게 둡니다):
+
+| key | 생성 | 조건 |
+| --- | --- | --- |
+| `JWT_ACCESS_KEY` | `openssl rand -base64 64 \| tr -d '\n'` (88자) | UTF-8 64바이트 이상, 공백 금지. 미달이면 기동 실패 |
+| `JWT_REFRESH_KEY` | 같은 명령으로 **따로** 생성 | 위와 같음. access 키와 다른 값 |
+| `REPORTER_KEY_PEPPER` | `openssl rand -base64 48 \| tr -d '\n'` (64자) | 32자 이상. 미달이면 기동 실패. **교체 금지** (아래) |
+
+### 키 표
+
+기준은 앱 레포 각 모듈 `src/main/resources/application*.yml` 의 `${...}` 자리표시자입니다
+(develop `942482a`, 2026-10-01). **필수**는 기본값이 없는 키로, 없으면 기동하지 못합니다. **기본값**이 있는 키는
+넣지 않아도 되고, 표의 dev 값을 비워 둔 것은 기본값을 그대로 쓴다는 뜻입니다.
+
+#### 공통 — `kv/sneezecast/backend/{env}/env`
+
+| key | 쓰는 서비스 | 필수 / 기본값 | dev 값 | 비고 |
+| --- | --- | --- | --- | --- |
+| `SPRING_PROFILES_ACTIVE` | 5종 | 기본값 `dev` | `dev` | prod 에는 **반드시** `prod`. 빠지면 dev 프로필(`ddl-auto: update`)로 뜬다 |
+| `SERVICE_DISCOVERY_HOSTNAME` | gateway · auth · surveillance · batch | 필수 | discovery 컨테이너명 | compose 에서 정한다 |
+| `SERVICE_DISCOVERY_PORT` | 5종 | 필수 | discovery 컨테이너 내부 포트 | discovery 의 `server.port` 이자 클라이언트 접속 포트. 호스트 포트(`3761`)가 아니다 |
+| `JWT_ACCESS_KEY` | gateway · auth · surveillance | 필수 | 생성 (위 표) | 세 서비스가 이 항목 하나를 읽는다 |
+| `REDIS_MASTER_NAME` | gateway · auth | 필수 | `master-redis` | `redis/sentinel.conf` 의 `sentinel monitor` 이름 |
+| `REDIS_SENTINEL_NODES` | gateway · auth | 필수 | `192.168.0.11:26379,192.168.0.13:26379,192.168.0.12:26379` | sentinel 1~3. 적재 전 `sentinel get-master-addr-by-name master-redis` 로 확인 |
+| `REDIS_PASSWORD` | gateway · auth | 필수 | 팀 Redis requirepass | BossPickSeoul · 혼디가개 secret 과 같은 값 (같은 Redis) |
+| `REDIS_KEY_PREFIX` | gateway · auth | 기본값 `sneezecast` | `sneezecast:dev` | prod 는 `sneezecast:prod`. 두 서비스가 같은 값이어야 한다(블랙리스트 키) |
+| `REDIS_COMMAND_TIMEOUT` | gateway · auth | 기본값 `1s` | | |
+| `AUTH_SERVICE_APP_NAME` | gateway (라우트 `lb://`) | 필수 | `auth-service` | auth 의 `SPRING_APPLICATION_NAME` 과 같아야 한다 |
+| `SURVEILLANCE_SERVICE_APP_NAME` | gateway (라우트 `lb://`) | 필수 | `surveillance-service` | surveillance 의 `SPRING_APPLICATION_NAME` 과 같아야 한다 |
+
+`SPRING_APPLICATION_NAME`(5종, 기본값은 각 서비스 이름)은 서비스마다 값이 달라 secret 에 한 키로 둘 수
+없습니다. 넣지 않고 기본값을 쓰거나, compose 가 `*_SERVICE_APP_NAME` 을 컨테이너별로 넘깁니다(혼디가개 방식).
+
+#### api-gateway — `kv/sneezecast/backend/{env}/api-gateway`
+
+| key | 필수 / 기본값 | 비고 |
+| --- | --- | --- |
+| `API_GATEWAY_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3000`(prod `4000`)은 compose 매핑 |
+| `GATEWAY_CONNECT_TIMEOUT_MS` | 기본값 `2000` | |
+| `GATEWAY_RESPONSE_TIMEOUT` | 기본값 `10s` | |
+| `JWT_BLACKLIST_FAIL_OPEN` | 기본값 `false` | 넣지 않는다. `true` 면 Redis 장애 때 폐기 토큰이 통과한다 |
+
+#### auth-service — `kv/sneezecast/backend/{env}/auth-service`
+
+| key | 필수 / 기본값 | 비고 |
+| --- | --- | --- |
+| `AUTH_SERVICE_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3081`(prod `4081`) |
+| `AUTH_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/auth?...` (URL 옵션은 혼디가개 secret 과 같게) |
+| `AUTH_DB_USERNAME` / `AUTH_DB_PASSWORD` | 필수 | `auth` 스키마 전용 계정 |
+| `JWT_REFRESH_KEY` | 필수 | 생성 (위 표). auth 만 쓰므로 공통이 아니다 |
+| `JWT_ACCESS_EXPIRATION` | 기본값 `PT15M` | 15분을 넘기면 기동 실패 |
+| `JWT_REFRESH_EXPIRATION` | 기본값 `P14D` | |
+| `MINIO_ENDPOINT` / `MINIO_PUBLIC_URL` | 필수 | storage MinIO(`.12`). 혼디가개 secret 과 같은 값 |
+| `MINIO_BUCKET` | 필수 | `sneezecast` (버킷은 따로 만든다) |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | 필수 | |
+| `MINIO_MAX_FILE_BYTES` | 기본값 `5242880` | |
+| `MULTIPART_MAX_REQUEST_SIZE` | 기본값 `6MB` | nginx `client_max_body_size 6M` 과 짝. 바꾸면 conf 도 함께 |
+
+#### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
+
+| key | 필수 / 기본값 | 비고 |
+| --- | --- | --- |
+| `SURVEILLANCE_SERVICE_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3082`(prod `4082`) |
+| `SURVEILLANCE_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/surveillance?...` |
+| `SURVEILLANCE_DB_USERNAME` / `SURVEILLANCE_DB_PASSWORD` | 필수 | auth 와 **다른** 계정 |
+| `REPORTER_KEY_PEPPER` | 필수 | 생성 (위 표). **이 경로에만** 둔다 |
+
+#### batch-service — `kv/sneezecast/backend/{env}/batch-service`
+
+| key | 필수 / 기본값 | 비고 |
+| --- | --- | --- |
+| `BATCH_SERVICE_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3080`(prod `4080`) |
+| `BATCH_DB_URL` | 필수 | `surveillance` 스키마 (적재 대상 + `BATCH_*` 메타 테이블) |
+| `BATCH_DB_USERNAME` / `BATCH_DB_PASSWORD` | 필수 | 적재 전용 계정. surveillance-service 계정과 다르다 |
+| `BATCH_SCHEDULE_ENABLED` | 기본값 dev `true` / prod `false` | prod 는 첫 적재를 dev 에서 관찰한 뒤 켠다 |
+
+외부 API 키(SGIS · 공공데이터포털)는 아직 yml 에 자리표시자가 없습니다. 생기는 이슈에서 batch-service
+경로와 이 표에 함께 추가합니다.
+
+### REPORTER_KEY_PEPPER — 교체 금지
+
+- `reporter_key = HMAC-SHA256(pepper, memberId)` 입니다. **교체 = 전 보고 재키잉**입니다. 바꾸면 기존 보고가
+  모두 다른 사람의 것처럼 갈라지고, 집계의 "같은 사람 같은 주 한 번" 이 깨집니다.
+- 잃으면 복구할 수 없습니다. 탈퇴 · 동의 철회 때의 보고 파기는 `memberId` 로 `reporter_key` 를 다시 계산해
+  찾으므로, pepper 가 없으면 파기 의무를 지킬 수 없습니다. 처음 만들 때 Vault 밖에 오프라인 사본을 한 부 둡니다.
+- **32자 이상 무작위**로 만들고(위 표의 `openssl` 명령), dev 와 prod 는 다른 값을 씁니다.
+- 공통 경로 · auth-service 경로에 두지 않습니다.
+- 기동 로그에는 SHA-256 앞 8자 지문만 남습니다. 값이 바뀌지 않았는지는 배포 전후 지문으로 확인합니다.
+
+## sneezecast Bootstrap
+
+정책 파일:
+
+- `policies/jenkins-sneezecast.hcl`: Jenkins 배포용 읽기 권한 (**backend + frontend 공용**, frontend 는 경로만 예약)
+- `policies/backend-sneezecast.hcl`: 배포 호스트 deploy/runtime 용 읽기 권한
+- `policies/ui-sneezecast.hcl`: Web UI 사용자가 `kv/sneezecast/*` 를 관리하는 권한
+
+실행:
+
+```bash
+cd ~/infra && git pull                         # .hcl 파일이 서버에 있어야 합니다
+docker exec -it vault vault status             # Sealed: false 확인
+docker exec -it -e VAULT_TOKEN='<root-token>' vault sh /vault/scripts/bootstrap-sneezecast.sh
+docker exec -it vault vault policy read jenkins-sneezecast   # 반영 확인
+```
+
+혼디가개 bootstrap 과 동작이 같습니다. `kv` mount 와 `approle`/`userpass` auth 는 이미 켜져 있으면 넘어가고,
+재실행해도 기존 `role_id`/`secret_id` 는 유지됩니다. **secret 값이나 키 자리는 만들지 않습니다** — `kv put` 은
+전체 덮어쓰기라 bootstrap 재실행이 실제 값을 지우게 됩니다. 값은 위 `저장 방법` 대로 넣습니다.
+
+> ⚠️ `install-vault.sh` 를 쓰지 마십시오. 컨테이너를 재생성하면 Vault 가 sealed 상태로 떠서 수동 unseal 이
+> 필요해집니다. 정책 변경에 컨테이너를 건드릴 이유가 없습니다.
+
+### AppRole
+
+| AppRole | 쓰는 곳 | Jenkins credential | 읽는 경로 |
+| --- | --- | --- | --- |
+| `jenkins-sneezecast` | backend 잡 5개 (frontend 잡 예정) | `sneezecast-vault-role-id`, `sneezecast-vault-secret-id` | `kv/sneezecast/backend/*`, `kv/sneezecast/frontend/*` |
+| `backend-sneezecast` | 배포 호스트 deploy/runtime | (deploy agent secret) | `kv/sneezecast/backend/*` |
+
+- TTL 은 혼디가개와 같습니다 (jenkins: token 1h/4h, secret_id 만료 없음 / backend: token 30m/2h, secret_id 720h).
+- 배포 lock 은 `sneezecast-backend-deploy`, dev deploy agent 는 `backend-dev2-agent`(라벨 `deploy-backend-dev2`,
+  backend-1 `192.168.0.13`)입니다.
+- 두 role 모두 서비스 경로를 가리지 않고 읽습니다 — pepper 격리는 위 `정책은 pepper 를 auth 쪽에서 막지 않는다` 참고.
+
+발급:
+
+```bash
+docker exec -it vault sh /vault/scripts/rotate-approle-secret.sh jenkins-sneezecast
+```
+
+출력된 `role_id` / `new_secret_id` 를 Jenkins Secret text credential
+`sneezecast-vault-role-id` / `sneezecast-vault-secret-id` 에 넣습니다.
+
+### Web UI 계정
+
+이미 쓰는 UI 계정이 있다면 새 계정을 만들지 말고 정책만 덧붙입니다. `policies` 는 **덮어쓰기**이므로 기존
+정책을 함께 적습니다 (`vault read auth/userpass/users/<username>` 로 먼저 확인).
+
+```bash
+docker exec -it vault vault write auth/userpass/users/<username>/policies \
+  policies="ui-bosspickseoul,ui-hondigagae,ui-sneezecast"
+```
+
+새로 만들려면 bootstrap 실행 시 `VAULT_UI_USERNAME` / `VAULT_UI_PASSWORD` 를 넘깁니다 (혼디가개 절과 같음).
+
+### kv 경로 초기화
+
+⚠️ **`reset-kv-bosspickseoul.sh` 를 sneezecast 정리에 쓰지 마십시오.** `kv` mount 를 통째로 지웁니다.
+
+```bash
+docker exec -it -e CONFIRM_RESET_KV=sneezecast vault sh /vault/scripts/reset-kv-sneezecast.sh
+```
+
+`REPORTER_KEY_PEPPER` 도 함께 지워집니다. 실행 전에 오프라인 사본이 있는지 확인합니다.
