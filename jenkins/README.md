@@ -21,9 +21,13 @@ main-server (dev 배포 대상)
 ├── backend-dev-agent               # label: deploy-backend-dev
 └── frontend-dev-agent              # label: deploy-frontend-dev
 
-backend-1 (prod 배포 대상)
-├── backend-prod-agent              # label: deploy-backend-prod
-└── frontend-prod-agent             # label: deploy-frontend-prod
+backend-1 (dev 배포 대상 2 — 2026-10-01 prod 에서 변경)
+└── backend-dev2-agent              # label: deploy-backend-dev2 (미기동)
+                                    # 프론트가 필요해지면 frontend-dev2-agent / deploy-frontend-dev2
+
+신규 미니PC (prod 배포 대상 — IP 미정, 미세팅)
+├── backend-prod-agent              # label: deploy-backend-prod (미기동)
+└── frontend-prod-agent             # label: deploy-frontend-prod (미기동, 프론트 prod 위치 미정)
 ```
 
 빌더는 하나를 공유하고(캐시 볼륨 때문), deploy agent 는 backend/frontend 로 나눕니다(담당 분리·executor 경합 방지). 자세한 근거는 아래 "노드/라벨 배치" 절을 참고합니다.
@@ -44,7 +48,7 @@ name: backend-dev-agent
 
 이 구성에서 `name:`을 쓰는 이유는 같은 서버에서 여러 agent를 동시에 띄울 수 있게 하기 위해서입니다. `backend-dev-agent`, `backend-prod-agent`가 같은 compose 파일을 쓰더라도 project name이 다르면 서로 다른 배포 단위로 관리할 수 있습니다.
 
-현재 배치가 실제로 이 기능을 씁니다. main-server 에 `backend-dev-agent` 와 `frontend-dev-agent` 를, backend-1 에 `backend-prod-agent` 와 `frontend-prod-agent` 를 함께 띄웁니다.
+현재 배치가 실제로 이 기능을 씁니다. main-server 에 `backend-dev-agent` 와 `frontend-dev-agent` 를 함께 띄우고, 신규 미니PC 에는 `backend-prod-agent` 와 `frontend-prod-agent` 를 함께 띄울 예정입니다. backend-1 의 `backend-dev2-agent` 도 같은 compose 파일을 다른 env 파일로 씁니다.
 
 주의할 점:
 
@@ -173,8 +177,13 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | `ai-host-builder` | ollama-01 (`192.168.0.10`) | `builder` `builder-backend` `builder-frontend` | Gradle build/test, Next.js install/build | 기동 중 — **`builder-frontend` 라벨 추가 필요** |
 | `backend-dev-agent` | main-server (`192.168.0.11`) | `deploy-backend-dev` | 백엔드 dev compose 배포 | 기동 중 |
 | `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
-| `backend-prod-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-prod` | 백엔드 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
-| `frontend-prod-agent` | backend-1 (`192.168.0.13`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
+| `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | **미기동 — 컨테이너 추가 필요** |
+| `backend-prod-agent` | 신규 미니PC (미정) | `deploy-backend-prod` | 백엔드 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
+| `frontend-prod-agent` | 신규 미니PC (미정) | `deploy-frontend-prod` | 프론트 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
+
+2026-10-01 에 backend-1 이 prod 에서 dev 서버 2 로 바뀌었습니다(루트 `README.md` §1). prod agent 두 개는 기동된 적이 없어 옮길 컨테이너는 없고, 띄울 위치만 백엔드 prod 전용으로 새로 들인 미니PC 로 바꿨습니다. 라벨은 그대로입니다. 미니PC 는 IP · 호스트명이 정해지지 않았고 아직 세팅 전입니다. `frontend-prod-agent` 는 프론트 prod 를 어디에 둘지 정해지면 위치를 다시 확인합니다.
+
+`backend-dev2-agent` 는 역할 · 호스트 기준 이름이라 특정 프로젝트 전용이 아닙니다. 첫 사용자는 sneezecast dev 백엔드이고, 다른 프로젝트의 dev 를 backend-1 에 올릴 때도 이 agent 를 씁니다. 프론트 dev 배포가 backend-1 에 필요해지면 `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`)를 같은 방식으로 추가합니다.
 
 노드명은 컨테이너명과 다릅니다. 빌더의 컨테이너명은 `jenkins-builder-agent` 이고 **노드명은 `ai-host-builder`** 입니다(`.env` 의 `JENKINS_BUILDER_NAME`). agent secret 이 노드명으로 발급되므로 이 값을 바꾸면 secret 도 다시 받아야 합니다.
 
@@ -193,6 +202,9 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 # main-server 에서
 sh install-jenkins-agent.sh .env.backend-dev
 sh install-jenkins-agent.sh .env.frontend-dev
+
+# backend-1(192.168.0.13) 에서
+sh install-jenkins-agent.sh .env.backend-dev2
 ```
 
 env 파일마다 `JENKINS_DEPLOY_AGENT_NAME` / `_PROJECT_NAME` / `_CONTAINER_NAME` / `_WORKDIR` 를 서로 다르게 둬야 컨테이너와 작업 디렉터리가 충돌하지 않습니다.
@@ -207,7 +219,7 @@ deploy agent 컨테이너 안의 `$HOME` 은 `/home/jenkins` 입니다. 파이�
 compose 의 **바인드 마운트**(혼디가개 batch 의 `BATCH_DATA_DIR` 등)는 `/var/run/docker.sock` 을 통해 호스트 데몬이
 해석하므로 Vault 에는 **호스트 경로**를 적어야 합니다.
 
-> **아키텍처 주의** — 빌더가 도는 ollama-01 은 x86_64(Ryzen 7 8845HS)이고, 배포 대상 main-server / backend-1 / storage 는 모두 aarch64 입니다. 백엔드는 JAR 이라 무관하지만, 프론트는 빌더에서 만든 `.next/standalone` 을 arm64 호스트에서 실행합니다. 현재 프론트 의존성에는 네이티브 모듈이 없어 문제가 없고, 파이프라인이 번들에 `*.node` 바이너리가 섞이면 빌드를 UNSTABLE 로 표시해 알려줍니다. 그 경고가 뜨면 `builder-frontend` 라벨을 arm64 노드로 옮겨야 합니다.
+> **아키텍처 주의** — 빌더가 도는 ollama-01 은 x86_64(Ryzen 7 8845HS)이고, 배포 대상 main-server / backend-1 / storage 는 모두 aarch64 입니다(prod 용 신규 미니PC 의 아키텍처는 아직 확인하지 않았습니다). 백엔드는 JAR 이라 무관하지만, 프론트는 빌더에서 만든 `.next/standalone` 을 arm64 호스트에서 실행합니다. 현재 프론트 의존성에는 네이티브 모듈이 없어 문제가 없고, 파이프라인이 번들에 `*.node` 바이너리가 섞이면 빌드를 UNSTABLE 로 표시해 알려줍니다. 그 경고가 뜨면 `builder-frontend` 라벨을 arm64 노드로 옮겨야 합니다.
 
 ### IaC 로 관리되는 범위
 
@@ -223,7 +235,7 @@ compose 의 **바인드 마운트**(혼디가개 batch 의 `BATCH_DATA_DIR` 등)
 | 잡(멀티브랜치 파이프라인) 정의 | 애플리케이션 레포의 `Jenkinsfile-*` (파라미터·게이트는 코드) |
 | 잡 생성 자체 | Jenkins UI 수작업 |
 
-inbound agent 방식이라 **컨트롤러에 노드가 먼저 있어야 컨테이너가 접속할 수 있습니다.** 그래서 순서는 항상 `Jenkins UI 에서 노드 생성(라벨 지정) → secret 복사 → .env 기입 → install 스크립트`입니다.
+inbound agent 방식이라 **컨트롤러에 노드가 먼저 있어야 컨테이너가 접속할 수 있습니다.** 그래서 순서는 항상 `Jenkins UI 에서 노드 생성(라벨 지정) → secret 복사 → .env 기입 → install 스크립트`입니다. `backend-dev2-agent` 도 같습니다 — 노드 `backend-dev2-agent` 를 라벨 `deploy-backend-dev2` 로 만들고, backend-1 에서 `.env.deploy-agent.example` 을 `.env.backend-dev2` 로 복사해 이름 4개와 secret 을 채운 뒤 `sh install-jenkins-agent.sh .env.backend-dev2` 를 실행합니다.
 
 노드와 잡까지 코드로 관리하려면 `configuration-as-code`(JCasC) + `job-dsl` 플러그인을 도입해 컨트롤러에 `CASC_JENKINS_CONFIG` 를 주입하는 방식이 있습니다. 지금은 도입하지 않았습니다(controller Dockerfile 에 플러그인 설치 단계가 없습니다). 노드가 3개뿐이라 관리 비용보다 도입 비용이 큽니다. **그래서 위 노드/라벨 표가 사실상의 정본입니다 — 라벨을 바꾸면 이 표를 함께 갱신합니다.**
 

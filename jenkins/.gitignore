@@ -13,6 +13,7 @@ update-center-rootCAs/
 jenkins-builder-agent/
 jenkins-deploy-agent/
 backend-dev-agent/
+backend-dev2-agent/
 backend-prod-agent/
 frontend-dev-agent/
 frontend-prod-agent/
