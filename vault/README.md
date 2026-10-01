@@ -1000,6 +1000,12 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | 필수 | |
 | `MINIO_MAX_FILE_BYTES` | 기본값 `5242880` | |
 | `MULTIPART_MAX_REQUEST_SIZE` | 기본값 `6MB` | nginx `client_max_body_size 6M` 과 짝. 바꾸면 conf 도 함께 |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | 필수 | 인증 코드 메일을 보내는 SMTP 계정. Gmail 이면 앱 비밀번호. `$` · 따옴표가 든 비밀번호는 파이프라인이 거부한다 (sneezecast#56) |
+| `MAIL_HOST` / `MAIL_PORT` | 기본값 `smtp.gmail.com` / `587` | STARTTLS |
+| `MAIL_FROM_NAME` / `MAIL_FROM_ADDRESS` | 기본값 `우리동네체온계` / 빈 값 | 발신 주소가 비면 SMTP 계정에서 유도한다 |
+| `LEGAL_TERMS_VERSION` · `LEGAL_PRIVACY_VERSION` · `LEGAL_SENSITIVE_HEALTH_INFO_VERSION` | 기본값 `2026-10-01` | 동의 문서 버전. 문서를 개정하면 올린다 — 이전 버전 동의자는 다음 로그인 때 재동의. 프론트 legal 상수와 같은 값 |
+| `SNOWFLAKE_DATACENTER_ID` / `SNOWFLAKE_WORKER_ID` | 기본값 `0` / `0` | 인스턴스를 늘리면 인스턴스마다 다른 `SNOWFLAKE_WORKER_ID`(0~31) |
+| `AUTH_EMAIL_SEND_*` (8개) | 모두 기본값 있음 | 인증 메일 발송 · 검증 한도(IP 상한 · 쿨다운 · 코드 수명 등). 목록과 기본값은 앱 레포 `backend/docs/deploy-guide.md` |
 
 #### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
 
