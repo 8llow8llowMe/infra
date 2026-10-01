@@ -484,3 +484,76 @@ docker exec nginx nginx -t && docker exec nginx nginx -s reload
 - 웹: `/var/log/nginx/hondigagae_web_dev_access.log`
 - 운영도 각각 `hondigagae_api_access.log`, `hondigagae_web_access.log` 에 따로 남는다
 - 전역 `/var/log/nginx/access.log` 에도 계속 기록된다
+
+---
+
+## sneezecast 도메인 맵
+
+| 도메인 | 대상 | 호스트 | 설정 파일 |
+| --- | --- | --- | --- |
+| `https://api-dev.sneezecast.com` | 개발 API 게이트웨이 | backend-1(dev 서버 2) `192.168.0.13:3000` | `conf.d/api-dev.sneezecast.conf` |
+
+이번에는 `api-dev` 하나만 만든다. 나머지는 대상이 정해지면 추가한다.
+
+| 도메인 | 상태 | 필요한 것 |
+| --- | --- | --- |
+| `dev.sneezecast.com` | 미작성 | 프론트(PWA) 호스트 결정. dev 포트는 `3300` 예정 |
+| `api.sneezecast.com` | 미작성 | 백엔드 prod 미니PC IP. 게이트웨이 `4000` 예정 |
+| `www.sneezecast.com` (+ apex) | 미작성 | 프론트 prod 호스트 결정. `4300` 예정, apex 는 `init-cert-with-www.sh` 로 www 와 함께 발급 |
+
+### auth-service 직결 라우트를 두지 않는다
+
+BossPickSeoul·혼디가개 conf 는 `/api/v1/auth`, `/api/v1/members`, `/auth-service/` 를 게이트웨이를
+거치지 않고 auth 포트(`x081`)로 보낸다. sneezecast 는 **모든 REST 를 게이트웨이(`3000`) 하나로만**
+보내고, auth(`3081`) · surveillance(`3082`) · batch(`3080`) · discovery(`3761`) 포트는 nginx 가 보지 않는다.
+
+- 서비스 actuator(`health`, `info`, `prometheus`)가 인증 없이 열려 있다. sneezecast 는
+  "서비스 포트를 외부에 노출하지 않는다" 를 배포 전제로 두고 있어(앱 레포 `backend/docs/modules.md`),
+  직결 location 하나가 그 전제를 깬다.
+- access token 블랙리스트 확인, 클라이언트가 보낸 회원 헤더 제거, 업스트림 타임아웃은 게이트웨이가
+  맡는다. 직결하면 이 검사를 건너뛴다.
+- 같은 이유로 혼디가개의 `/api-gateway/` prefix 직결도 두지 않는다. 그 location 은 게이트웨이의
+  `/actuator/**` 까지 그대로 연다. `/api/` 밖의 경로는 전부 404 다.
+
+Swagger 집계 라우트도 없다. 게이트웨이에 아직 집계가 없어서다 — 생기면 혼디가개 conf 의 `[A]` 블록을 옮긴다.
+
+### ⚠️ HTTPS 블록이 주석 처리된 상태로 커밋되어 있다
+
+혼디가개와 같다. `ssl_certificate` 파일이 없으면 `nginx -t` 가 실패하고, 이 nginx 는 전 도메인의 단일
+인그레스라 다른 프로젝트 도메인까지 함께 내려간다. `listen 80` 블록이 HTTP-01 챌린지 경로를 이미 열어
+주므로 `create-ssl-bootstrap-conf.sh` 로 bootstrap conf 를 만들 필요는 없다.
+
+적용 순서:
+
+```bash
+# 0) DNS: api-dev.sneezecast.com A 레코드 -> 공개 Nginx 호스트. 전파 확인 후 진행한다
+#    (전파 전에 발급하면 HTTP-01 검증이 실패하고, 실패가 쌓이면 Let's Encrypt rate limit 에 걸린다)
+dig +short api-dev.sneezecast.com
+
+# 1) conf 를 배치하고 HTTP 블록만 살린 채 reload
+cd ~/infra && git pull
+docker exec nginx nginx -t && docker exec nginx nginx -s reload
+
+# 2) 인증서 발급
+cd ~/infra/certbot
+./init-cert-non-www.sh api-dev.sneezecast.com
+
+# 3) conf 의 HTTPS 블록 주석 해제 후 다시 reload
+docker exec nginx nginx -t && docker exec nginx nginx -s reload
+```
+
+3) 을 하기 전에는 `https://api-dev.sneezecast.com` 이 열리지 않는다(HTTP 는 HTTPS 로 301). 게이트웨이가
+`.13` 에 아직 배포되지 않았다면 3) 뒤에도 502 가 나는 것이 정상이다.
+
+### DNS 체크리스트
+
+- `api-dev.sneezecast.com` A/AAAA 또는 CNAME -> 공개 Nginx 호스트
+
+### Certbot 체크리스트
+
+- `api-dev.sneezecast.com` 은 별도 인증서(`/etc/letsencrypt/live/api-dev.sneezecast.com/`)를 쓴다
+
+### 개발 access 로그
+
+- API: `/var/log/nginx/sneezecast_api_dev_access.log`
+- 전역 `/var/log/nginx/access.log` 에도 계속 기록된다
