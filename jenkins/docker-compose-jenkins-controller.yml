@@ -5,6 +5,9 @@ services:
     image: ${JENKINS_CONTROLLER_IMAGE:-jenkins-controller:latest}
     container_name: ${JENKINS_CONTROLLER_CONTAINER_NAME:-jenkins-controller}
     restart: unless-stopped
+    mem_limit: ${JENKINS_CONTROLLER_MEM_LIMIT:-2560m}
+    memswap_limit: ${JENKINS_CONTROLLER_MEM_LIMIT:-2560m}
+    cpus: ${JENKINS_CONTROLLER_CPUS:-2.0}
     build:
       context: .
       dockerfile: jenkins-controller.Dockerfile

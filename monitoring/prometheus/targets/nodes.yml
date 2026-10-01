@@ -4,6 +4,15 @@
     project: infra
   targets:
     - node-exporter:9100
+
+# ollama-01: Ollama, Jenkins controller/builder, Kafka, Vault가 함께 실행되는 호스트.
+# 192.168.0.10에서 node_exporter를 실행한 뒤 UP 상태를 확인한다.
+- labels:
+    host: ollama-01
+    role: infra
+    project: infra
+  targets:
+    - 192.168.0.10:9100
 - labels:
     host: backend-1
     role: backend

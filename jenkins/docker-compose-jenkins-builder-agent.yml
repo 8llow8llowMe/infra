@@ -5,6 +5,11 @@ services:
     image: ${JENKINS_BUILDER_IMAGE:-jenkins-builder-agent:latest}
     container_name: ${JENKINS_BUILDER_CONTAINER_NAME:-jenkins-builder-agent}
     restart: unless-stopped
+    mem_limit: ${JENKINS_BUILDER_MEM_LIMIT:-3g}
+    memswap_limit: ${JENKINS_BUILDER_MEM_LIMIT:-3g}
+    cpus: ${JENKINS_BUILDER_CPUS:-4.0}
+    pids_limit: ${JENKINS_BUILDER_PIDS_LIMIT:-1024}
+    oom_score_adj: 500
     build:
       context: .
       dockerfile: jenkins-builder-agent.Dockerfile
@@ -14,6 +19,7 @@ services:
       JENKINS_AGENT_SECRET: ${JENKINS_BUILDER_SECRET}
       JENKINS_AGENT_WORKDIR: /home/jenkins/agent
       JENKINS_AGENT_CACHE_PROFILE: builder
+      GRADLE_OPTS: ${JENKINS_BUILDER_GRADLE_OPTS:--Dorg.gradle.workers.max=2 -Dorg.gradle.daemon=false}
       TZ: ${TZ}
     volumes:
       - ${JENKINS_BUILDER_WORKDIR:-./jenkins-builder-agent}:/home/jenkins/agent

@@ -21,6 +21,8 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `deploy` (모니터링) | `192.168.0.14` | 미실측 | 미실측 | 미실측 | 미실측 | Grafana · Prometheus |
 | 신규 미니PC (호스트명 미정) | 미정 | 미실측 | 미실측 | 미실측 | 미실측 | **백엔드 prod 전용** — 2026-10-01 기준 미세팅 |
 
+> `ollama-01`의 총 `30Gi`는 2026-08-14 측정값입니다. RAM 32GB(decimal)는 약 29.8GiB이므로 이 수치만으로 BIOS UMA가 2GB인지 8GB인지 판단할 수 없습니다. 현재 `MemTotal`과 `mem_info_vram_total`을 다시 측정합니다. API 모델은 `gpt-oss:20b`이며, 자원 예산과 UMA 비교 절차는 [ollama-01 안정화 가이드](ollama/HOST-STABILITY.md)를 따릅니다.
+
 > **아키텍처**: `ollama-01` 만 x86_64 이고 나머지 라즈베리파이 계열은 aarch64 입니다. Jenkins 빌더가 `ollama-01` 에 있으므로 **네이티브 바이너리가 포함되는 산출물은 그대로 배포하면 안 됩니다.** JAR 은 무관하지만 Node/Python 산출물은 영향을 받습니다. 신규 미니PC 의 아키텍처는 아직 확인하지 않았습니다.
 
 ---
