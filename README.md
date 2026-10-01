@@ -232,7 +232,7 @@ Jenkins credential(`hondigagae-vault-*`), 배포 lock(`hondigagae-backend-deploy
 | Jenkins 빌더 | `ai-host-builder`(`.10`) |
 | Vault | `.10` 의 Vault 를 함께 씁니다 |
 | Redis | 3노드 센티널(`.11` / `.13` / `.12`) |
-| MySQL | dev MySQL(`.11`) 에 스키마 `auth` · `surveillance`. 계정은 3개 — auth / surveillance / batch 적재 전용 |
+| MySQL | dev MySQL(`.11`) 에 스키마 `sneezecast_auth` · `sneezecast_surveillance`(공유 MySQL 이라 접두어). 계정은 3개 — auth / surveillance / batch 적재 전용 |
 | MinIO | `.12`, 버킷 `sneezecast` |
 
 prod 의 DB 위치는 아직 정하지 않았습니다.
