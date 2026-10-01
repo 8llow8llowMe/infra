@@ -898,16 +898,17 @@ kv/sneezecast/frontend/{env}/env                   # 프론트가 생기면
   모른다" 로 정해 두었습니다. DB 계정 세 개(auth · surveillance · batch)를 나눈 것도 같은 경계입니다.
 - **같은 키를 두 경로에 넣지 않습니다.** 어느 값이 이기는지에 기대지 않습니다.
 
-#### 파이프라인 요구사항 (앱 레포 몫, 아직 없음)
+#### 파이프라인 — 앱 레포에 구현됨 (sneezecast#10)
 
-혼디가개 `Jenkinsfile.backend-common.groovy` 는 `{root}/{env}/env` **한 경로만** 읽습니다. sneezecast 잡은
-`{root}/{env}/env` 와 `{root}/{env}/{serviceName}` 을 읽어 합친 뒤 `.env.runtime` 을 만들어야 합니다.
+앱 레포 `Jenkinsfile.backend-common.groovy` 가 잡마다 `{root}/{env}/env` 와 `{root}/{env}/{serviceName}` 을 읽어
+합친 뒤 `.env.runtime` 을 만듭니다. 상세는 앱 레포 `backend/docs/deploy-guide.md` 입니다.
 
-- 서비스 경로가 없으면(service-discovery) 공통만 씁니다.
+- 서비스 경로는 잡의 `serviceName` 으로만 조립합니다(경로를 바꾸는 빌드 파라미터 없음). service-discovery 는 공통만 읽습니다.
 - 같은 키가 양쪽에 있으면 **실패**시킵니다 (덮어쓰지 않음).
-- 혼디가개 판을 그대로 복사하면 surveillance 는 pepper 가 없어 기동에 실패합니다(fail-fast, 조용히 돌지 않음).
-  또 혼디가개 판의 `requiredBuildEnvKeys()` 는 `JASYPT_ENCRYPTOR_KEY` 를 요구하는데, sneezecast yml 에는 그
-  자리표시자도 `ENC(...)` 값도 없습니다. 복사할 때 목록을 sneezecast 에 맞춥니다.
+- 서비스 전용 키(`REPORTER_KEY_PEPPER` · `SURVEILLANCE_DB_*` · `AUTH_DB_*` · `BATCH_DB_*`)가 공통이나 남의 서비스
+  경로에 있으면 **실패**시킵니다 — pepper 를 공통에 잘못 넣는 실수까지 막습니다.
+- 서비스별 필수 키(아래 표의 "필수")가 비면 배포 전에 실패합니다. `JASYPT_ENCRYPTOR_KEY` 는 요구하지 않습니다.
+- `SPRING_PROFILES_ACTIVE` 가 배포 환경(dev / prod)과 다르면 실패합니다.
 
 #### 정책은 pepper 를 auth 쪽에서 막지 않는다
 
@@ -926,6 +927,10 @@ Vault 단에서도 막으려면 surveillance 잡 전용 AppRole(정책: `.../+/s
 
 혼디가개와 같습니다. 파이프라인은 secret 의 `data.data` 를 **키별 평면 맵**으로 읽고 줄바꿈이 든 값을
 거부합니다. `env_file=@.env` 한 키 저장은 배포 단계에서 실패합니다.
+
+sneezecast 파이프라인은 **`$` 가 든 값과 따옴표(`"` · `'`)로 감싼 값도 거부**합니다. compose 의 env-file 은
+따옴표 없는 값에 `$VAR` 치환을 해서, 예를 들어 pepper 가 조용히 다른 값으로 바뀌면 전 보고가 재키잉됩니다.
+무작위 값은 아래 명령(base64)으로 만들면 `$` 가 나오지 않습니다. 팀 Redis · DB 비밀번호에 `$` 가 있으면 바꿔야 합니다.
 
 - Web UI: secret 을 만들 때 **JSON 토글**을 켜고 `{"KEY": "value", ...}` 를 붙여 넣습니다. 비밀값은 셸 이력에
   남지 않도록 이 방법을 권합니다.
@@ -957,8 +962,8 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | key | 쓰는 서비스 | 필수 / 기본값 | dev 값 | 비고 |
 | --- | --- | --- | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | 5종 | 기본값 `dev` | `dev` | prod 에는 **반드시** `prod`. 빠지면 dev 프로필(`ddl-auto: update`)로 뜬다 |
-| `SERVICE_DISCOVERY_HOSTNAME` | gateway · auth · surveillance · batch | 필수 | discovery 컨테이너명 | compose 에서 정한다 |
-| `SERVICE_DISCOVERY_PORT` | 5종 | 필수 | discovery 컨테이너 내부 포트 | discovery 의 `server.port` 이자 클라이언트 접속 포트. 호스트 포트(`3761`)가 아니다 |
+| `SERVICE_DISCOVERY_HOSTNAME` | gateway · auth · surveillance · batch | 필수 | `192.168.0.13` | 사설 IP (배치 원칙 4). prod 는 미니PC IP(미정). 파이프라인이 환경별 기대값과 대조 |
+| `SERVICE_DISCOVERY_PORT` | 5종 | 필수 | `3761` (prod `4761`) | discovery 의 `server.port` = 호스트 포트 = 클라이언트 접속 포트. 모든 잡이 기대값과 대조 |
 | `JWT_ACCESS_KEY` | gateway · auth · surveillance | 필수 | 생성 (위 표) | 세 서비스가 이 항목 하나를 읽는다 |
 | `REDIS_MASTER_NAME` | gateway · auth | 필수 | `master-redis` | `redis/sentinel.conf` 의 `sentinel monitor` 이름 |
 | `REDIS_SENTINEL_NODES` | gateway · auth | 필수 | `192.168.0.11:26379,192.168.0.13:26379,192.168.0.12:26379` | sentinel 1~3. 적재 전 `sentinel get-master-addr-by-name master-redis` 로 확인 |
@@ -975,7 +980,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
-| `API_GATEWAY_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3000`(prod `4000`)은 compose 매핑 |
+| `API_GATEWAY_PORT` | 필수 | `3000`(prod `4000`). **컨테이너 내부 포트 = 호스트 포트** — 파이프라인이 잡의 `hostPorts` 와 대조 |
 | `GATEWAY_CONNECT_TIMEOUT_MS` | 기본값 `2000` | |
 | `GATEWAY_RESPONSE_TIMEOUT` | 기본값 `10s` | |
 | `JWT_BLACKLIST_FAIL_OPEN` | 기본값 `false` | 넣지 않는다. `true` 면 Redis 장애 때 폐기 토큰이 통과한다 |
@@ -984,9 +989,9 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
-| `AUTH_SERVICE_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3081`(prod `4081`) |
-| `AUTH_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/auth?...` (URL 옵션은 혼디가개 secret 과 같게) |
-| `AUTH_DB_USERNAME` / `AUTH_DB_PASSWORD` | 필수 | `auth` 스키마 전용 계정 |
+| `AUTH_SERVICE_PORT` | 필수 | `3081`(prod `4081`). 내부 포트 = 호스트 포트. 호스트에는 `127.0.0.1` 로만 publish (LAN 비노출) |
+| `AUTH_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/sneezecast_auth?...` (URL 옵션은 혼디가개 secret 과 같게) |
+| `AUTH_DB_USERNAME` / `AUTH_DB_PASSWORD` | 필수 | `sneezecast_auth` 스키마 전용 계정 |
 | `JWT_REFRESH_KEY` | 필수 | 생성 (위 표). auth 만 쓰므로 공통이 아니다 |
 | `JWT_ACCESS_EXPIRATION` | 기본값 `PT15M` | 15분을 넘기면 기동 실패 |
 | `JWT_REFRESH_EXPIRATION` | 기본값 `P14D` | |
@@ -1000,8 +1005,8 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
-| `SURVEILLANCE_SERVICE_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3082`(prod `4082`) |
-| `SURVEILLANCE_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/surveillance?...` |
+| `SURVEILLANCE_SERVICE_PORT` | 필수 | `3082`(prod `4082`). 내부 포트 = 호스트 포트. 호스트에는 `127.0.0.1` 로만 publish |
+| `SURVEILLANCE_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/sneezecast_surveillance?...` |
 | `SURVEILLANCE_DB_USERNAME` / `SURVEILLANCE_DB_PASSWORD` | 필수 | auth 와 **다른** 계정 |
 | `REPORTER_KEY_PEPPER` | 필수 | 생성 (위 표). **이 경로에만** 둔다 |
 
@@ -1009,8 +1014,8 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
-| `BATCH_SERVICE_PORT` | 필수 | 컨테이너 내부 포트. 호스트 `3080`(prod `4080`) |
-| `BATCH_DB_URL` | 필수 | `surveillance` 스키마 (적재 대상 + `BATCH_*` 메타 테이블) |
+| `BATCH_SERVICE_PORT` | 필수 | `3080`(prod `4080`). 내부 포트 = 호스트 포트. 호스트에는 `127.0.0.1` 로만 publish |
+| `BATCH_DB_URL` | 필수 | `sneezecast_surveillance` 스키마 (적재 대상 + `BATCH_*` 메타 테이블) |
 | `BATCH_DB_USERNAME` / `BATCH_DB_PASSWORD` | 필수 | 적재 전용 계정. surveillance-service 계정과 다르다 |
 | `BATCH_SCHEDULE_ENABLED` | 기본값 dev `true` / prod `false` | prod 는 첫 적재를 dev 에서 관찰한 뒤 켠다 |
 
