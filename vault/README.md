@@ -1009,6 +1009,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `AUTH_LOGIN_MAX_FAILURE_COUNT` / `AUTH_LOGIN_LOCK_DURATION` | 기본값 `5` / `PT10M` | 이메일당 로그인 실패 허용 횟수와 잠금 시간. 잠금 시간을 바꾸면 프론트 잠금 문구("10분 뒤")도 함께 (sneezecast#57) |
 | `AUTH_LOGIN_IP_MAX_FAILURE_COUNT` / `AUTH_LOGIN_IP_WINDOW` | 기본값 `30` / `PT1H` | IP당 로그인 실패 상한과 창 |
 | `AUTH_SESSION_MAX_DEVICES` / `AUTH_SESSION_ROTATION_GRACE` | 기본값 `5` / `PT10S` | 회원당 로그인 기기 상한, 여러 탭 동시 재발급을 경합으로 봐 주는 시간 |
+| `AUTH_PASSWORD_RESET_TOKEN_TTL` | 기본값 `PT15M` | 비밀번호 재설정 토큰 수명. 재설정 코드 한도는 `AUTH_EMAIL_SEND_*` 를 함께 쓴다 (sneezecast#58) |
 
 #### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
 
