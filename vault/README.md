@@ -1006,6 +1006,9 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `LEGAL_TERMS_VERSION` · `LEGAL_PRIVACY_VERSION` · `LEGAL_SENSITIVE_HEALTH_INFO_VERSION` | 기본값 `2026-10-01` | 동의 문서 버전. 문서를 개정하면 올린다 — 이전 버전 동의자는 다음 로그인 때 재동의. 프론트 legal 상수와 같은 값 |
 | `SNOWFLAKE_DATACENTER_ID` / `SNOWFLAKE_WORKER_ID` | 기본값 `0` / `0` | 인스턴스를 늘리면 인스턴스마다 다른 `SNOWFLAKE_WORKER_ID`(0~31) |
 | `AUTH_EMAIL_SEND_*` (8개) | 모두 기본값 있음 | 인증 메일 발송 · 검증 한도(IP 상한 · 쿨다운 · 코드 수명 등). 목록과 기본값은 앱 레포 `backend/docs/deploy-guide.md` |
+| `AUTH_LOGIN_MAX_FAILURE_COUNT` / `AUTH_LOGIN_LOCK_DURATION` | 기본값 `5` / `PT10M` | 이메일당 로그인 실패 허용 횟수와 잠금 시간. 잠금 시간을 바꾸면 프론트 잠금 문구("10분 뒤")도 함께 (sneezecast#57) |
+| `AUTH_LOGIN_IP_MAX_FAILURE_COUNT` / `AUTH_LOGIN_IP_WINDOW` | 기본값 `30` / `PT1H` | IP당 로그인 실패 상한과 창 |
+| `AUTH_SESSION_MAX_DEVICES` / `AUTH_SESSION_ROTATION_GRACE` | 기본값 `5` / `PT10S` | 회원당 로그인 기기 상한, 여러 탭 동시 재발급을 경합으로 봐 주는 시간 |
 
 #### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
 
