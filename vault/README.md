@@ -1010,6 +1010,11 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `AUTH_LOGIN_IP_MAX_FAILURE_COUNT` / `AUTH_LOGIN_IP_WINDOW` | 기본값 `30` / `PT1H` | IP당 로그인 실패 상한과 창 |
 | `AUTH_SESSION_MAX_DEVICES` / `AUTH_SESSION_ROTATION_GRACE` | 기본값 `5` / `PT10S` | 회원당 로그인 기기 상한, 여러 탭 동시 재발급을 경합으로 봐 주는 시간 |
 | `AUTH_PASSWORD_RESET_TOKEN_TTL` | 기본값 `PT15M` | 비밀번호 재설정 토큰 수명. 재설정 코드 한도는 `AUTH_EMAIL_SEND_*` 를 함께 쓴다 (sneezecast#58) |
+| `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | 필수 | 카카오 개발자 콘솔 앱의 REST API 키 / Client Secret. 동의 항목 `account_email` · `profile_nickname` 을 켠다 (sneezecast#61) |
+| `KAKAO_REDIRECT_URI` | 필수 | 프론트 콜백 페이지. dev `https://dev.sneezecast.com/login/kakao/callback` · prod `https://www.sneezecast.com/login/kakao/callback` — 카카오 콘솔에 등록한 값과 같아야 한다 |
+| `KAKAO_CONNECT_TIMEOUT` / `KAKAO_READ_TIMEOUT` | 기본값 `PT1S` / `PT2S` | 카카오 API timeout. 로그인 한 번에 두 번 부르므로 합계가 게이트웨이 response-timeout(10초)보다 짧게 둔다 |
+| `AUTH_OAUTH_STATE_TTL` · `AUTH_OAUTH_SIGNUP_TICKET_TTL` · `AUTH_OAUTH_LINK_TICKET_TTL` | 기본값 `PT10M` · `PT30M` · `PT10M` | 카카오 로그인 state · 신규 가입표 · 기존 계정 연결 확인표 수명 |
+| `AUTH_OAUTH_AUTHORIZE_IP_MAX_COUNT` / `AUTH_OAUTH_AUTHORIZE_IP_WINDOW` | 기본값 `30` / `PT10M` | 카카오 인가 시작(authorize) IP 상한 |
 
 #### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
 
