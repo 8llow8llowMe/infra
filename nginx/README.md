@@ -140,16 +140,6 @@ location /.well-known/acme-challenge/ {
 
 ## 현재 설정 파일 설명
 
-### conf.d/tripmarble.conf
-
-- `tripmarble.com` 을 `www.tripmarble.com` 으로 정규화
-- 메인 웹 요청을 `web-ssr:3000` 으로 프록시
-
-### conf.d/api.tripmarble.conf
-
-- `api.tripmarble.com` 처리
-- `/auth-service/` 와 `/api-gateway/` 를 서로 다른 백엔드로 전달
-
 ### conf.d/jamjamnow.conf
 
 - 정적 파일은 MinIO에서 제공

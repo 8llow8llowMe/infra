@@ -66,7 +66,6 @@ Redis 는 3노드 센티널이라 `.11` / `.13` / `.12` 에 한 대씩 나눠 �
 
 - `nginx/conf.d/api.bosspickseoul.conf` 의 `upstream` 2줄이 `192.168.0.13:9000`(게이트웨이), `192.168.0.13:9081`(auth) 을 봅니다. 운영 프론트 `nginx/conf.d/bosspickseoul.conf` 는 `192.168.0.13:9300` 입니다(프론트 prod 위치는 미정).
 - 혼디가개도 같습니다 — `api.hondigagae.conf`(5000 / 5081), `hondigagae.conf`(5300).
-- `nginx/conf.d/api.tripmarble.conf` 가 `192.168.0.13:8081` / `8000` 으로 프록시합니다. TripMarble prod 를 내렸으므로 지금은 응답할 대상이 없을 것으로 보입니다(미확인).
 - Prometheus `monitoring/prometheus/targets/nodes.yml` 에 `backend-1` 이 `role: backend`, `project: bosspickseoul` 로 등록되어 있습니다. 역할이 dev 2 로 바뀌었으니 라벨을 갱신해야 합니다. `bosspickseoul-*-prod.yml` 의 대상 IP 도 미니PC 로 바꿉니다.
 - Jenkins `backend-prod-agent` / `frontend-prod-agent` 는 미니PC 에 띄웁니다(`jenkins/README.md` 노드/라벨 표).
 
