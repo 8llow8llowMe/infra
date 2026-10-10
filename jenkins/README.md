@@ -28,7 +28,7 @@ backend-1 (dev 배포 대상 2 — 2026-10-01 prod 에서 변경)
 
 backend-server (prod 배포 대상 — 192.168.0.9, 2026-10-10 세팅)
 ├── backend-prod-agent              # label: deploy-backend-prod (2026-10-10 기동)
-└── frontend-prod-agent             # label: deploy-frontend-prod (미기동, 프론트 prod 위치 미정)
+└── frontend-prod-agent             # label: deploy-frontend-prod (혼디가개 프론트 prod)
 ```
 
 빌더는 하나를 공유하고(캐시 볼륨 때문), deploy agent 는 backend/frontend 로 나눕니다(담당 분리·executor 경합 방지). 자세한 근거는 아래 "노드/라벨 배치" 절을 참고합니다.
@@ -49,7 +49,7 @@ name: backend-dev-agent
 
 이 구성에서 `name:`을 쓰는 이유는 같은 서버에서 여러 agent를 동시에 띄울 수 있게 하기 위해서입니다. `backend-dev-agent`, `backend-prod-agent`가 같은 compose 파일을 쓰더라도 project name이 다르면 서로 다른 배포 단위로 관리할 수 있습니다.
 
-현재 배치가 실제로 이 기능을 씁니다. main-server 에 `backend-dev-agent` 와 `frontend-dev-agent` 를 함께 띄우고, prod 미니PC `backend-server` 에는 `backend-prod-agent` 를 띄웠고(2026-10-10), 프론트 prod 를 같은 호스트에 두기로 하면 `frontend-prod-agent` 를 함께 띄웁니다. backend-1 의 `backend-dev2-agent` 도 같은 compose 파일을 다른 env 파일로 씁니다.
+현재 배치가 실제로 이 기능을 씁니다. main-server 에 `backend-dev-agent` 와 `frontend-dev-agent` 를 함께 띄우고, prod 미니PC `backend-server` 에는 `backend-prod-agent` 를 띄웠고(2026-10-10), 혼디가개 프론트 prod 도 같은 호스트에 두기로 해(2026-10-10) `frontend-prod-agent` 를 함께 띄웁니다. backend-1 의 `backend-dev2-agent` 도 같은 compose 파일을 다른 env 파일로 씁니다.
 
 주의할 점:
 
@@ -184,9 +184,9 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
 | `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | **미기동 — 컨테이너 추가 필요** |
 | `backend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-backend-prod` | 백엔드 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
-| `frontend-prod-agent` | 미정 (프론트 prod 위치 미정) | `deploy-frontend-prod` | 프론트 prod compose 배포 | **미기동 — 컨테이너 추가 필요** |
+| `frontend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | **미기동 — Jenkins 노드 생성 대기** (env 파일 준비됨) |
 
-2026-10-01 에 backend-1 이 prod 에서 dev 서버 2 로 바뀌었습니다(루트 `README.md` §1). prod agent 두 개는 기동된 적이 없어 옮길 컨테이너는 없고, 띄울 위치만 백엔드 prod 전용으로 새로 들인 미니PC 로 바꿨습니다. 라벨은 그대로입니다. 미니PC 는 2026-10-10 에 `backend-server`(`192.168.0.9`)로 세팅했고 `backend-prod-agent` 를 띄웠습니다. `frontend-prod-agent` 는 프론트 prod 를 어디에 둘지 정해지면 위치를 다시 확인합니다.
+2026-10-01 에 backend-1 이 prod 에서 dev 서버 2 로 바뀌었습니다(루트 `README.md` §1). prod agent 두 개는 기동된 적이 없어 옮길 컨테이너는 없고, 띄울 위치만 백엔드 prod 전용으로 새로 들인 미니PC 로 바꿨습니다. 라벨은 그대로입니다. 미니PC 는 2026-10-10 에 `backend-server`(`192.168.0.9`)로 세팅했고 `backend-prod-agent` 를 띄웠습니다. `frontend-prod-agent` 도 같은 호스트에 둡니다(혼디가개 프론트 prod, 2026-10-10 결정).
 
 `backend-dev2-agent` 는 역할 · 호스트 기준 이름이라 특정 프로젝트 전용이 아닙니다. 첫 사용자는 sneezecast dev 백엔드이고, 다른 프로젝트의 dev 를 backend-1 에 올릴 때도 이 agent 를 씁니다. 프론트 dev 배포가 backend-1 에 필요해지면 `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`)를 같은 방식으로 추가합니다.
 
@@ -213,6 +213,7 @@ sh install-jenkins-agent.sh .env.backend-dev2
 
 # backend-server(192.168.0.9) 에서 — 2026-10-10 기동
 sh install-jenkins-agent.sh .env.backend-prod
+sh install-jenkins-agent.sh .env.frontend-prod
 ```
 
 env 파일마다 `JENKINS_DEPLOY_AGENT_NAME` / `_PROJECT_NAME` / `_CONTAINER_NAME` / `_WORKDIR` 를 서로 다르게 둬야 컨테이너와 작업 디렉터리가 충돌하지 않습니다.

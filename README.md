@@ -21,7 +21,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `storage` | `192.168.0.12` | aarch64 / Cortex-A76 | **1.9Gi** | 1.1Gi | **0** | 인그레스 · 오브젝트 스토리지 |
 | `backend-1` | `192.168.0.13` | aarch64 | 7.7Gi | **6.4Gi** | 2.0Gi | **dev 애플리케이션 2** (2026-10-01 prod → dev 변경) |
 | `deploy` (모니터링) | `192.168.0.14` | 미실측 | 미실측 | 미실측 | 미실측 | Grafana · Prometheus |
-| `backend-server` | `192.168.0.9` | x86_64 | 12.6Gi | 11Gi | 4.0Gi | **백엔드 prod 전용** (2026-10-10 세팅) |
+| `backend-server` | `192.168.0.9` | x86_64 | 15Gi | 13Gi | 4.0Gi | **prod 애플리케이션 전용** (2026-10-10 세팅) |
 
 > `ollama-01`의 총 `30Gi`는 2026-08-14 측정값입니다. RAM 32GB(decimal)는 약 29.8GiB이므로 이 수치만으로 BIOS UMA가 2GB인지 8GB인지 판단할 수 없습니다. 현재 `MemTotal`과 `mem_info_vram_total`을 다시 측정합니다. API 모델은 `gpt-oss:20b`이며, 자원 예산과 UMA 비교 절차는 [ollama-01 안정화 가이드](ollama/HOST-STABILITY.md)를 따릅니다.
 
@@ -38,7 +38,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
 | `192.168.0.13` backend-1 | sneezecast **dev 백엔드**(예정), backend-dev2-agent(예정), redis-node2 + sentinel2 |
 | `192.168.0.14` deploy | grafana, prometheus, node-exporter |
-| `192.168.0.9` backend-server | docker, backend-prod-agent — 각 프로젝트 **prod 백엔드** 배포 대상 (2026-10-10 기동) |
+| `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10) |
 
 **혼디가개 prod DB 는 `backend-server` 가 아니라 `.11` main-server 의 mysql 에 있습니다** (스키마 `hondigagae_{auth,tour,plan}_prod`, 2026-10-10 생성). 아래 4절 2번 "dev 와 prod 는 호스트를 공유하지 않는다" 의 예외로, 애플리케이션은 분리하고 DB 인스턴스만 dev 와 함께 씁니다. 그래서 `.11` mysql 의 재시작 · 디스크 · 백업이 prod 에도 영향을 줍니다.
 
@@ -71,7 +71,7 @@ Redis 는 3노드 센티널이라 `.11` / `.13` / `.12` 에 한 대씩 나눠 �
 - `nginx/conf.d/api.bosspickseoul.conf` 의 `upstream` 2줄이 `192.168.0.13:9000`(게이트웨이), `192.168.0.13:9081`(auth) 을 봅니다. 운영 프론트 `nginx/conf.d/bosspickseoul.conf` 는 `192.168.0.13:9300` 입니다(프론트 prod 위치는 미정).
 - 혼디가개도 같습니다 — `api.hondigagae.conf`(5000 / 5081), `hondigagae.conf`(5300).
 - Prometheus `monitoring/prometheus/targets/nodes.yml` 에 `backend-1` 이 `role: backend`, `project: bosspickseoul` 로 등록되어 있습니다. 역할이 dev 2 로 바뀌었으니 라벨을 갱신해야 합니다. `bosspickseoul-*-prod.yml` 의 대상 IP 도 미니PC 로 바꿉니다.
-- Jenkins `backend-prod-agent` 는 2026-10-10 에 미니PC 에 기동했습니다. `frontend-prod-agent` 는 프론트 prod 위치가 정해지면 띄웁니다(`jenkins/README.md` 노드/라벨 표).
+- Jenkins `backend-prod-agent` 는 2026-10-10 에 미니PC 에 기동했습니다. 혼디가개 프론트 prod 도 같은 호스트에 두기로 해(2026-10-10) `frontend-prod-agent` 를 함께 띄웁니다(`jenkins/README.md` 노드/라벨 표).
 
 문서상 `backend-prod-agent` 는 한 번도 기동된 적이 없으므로(`jenkins/README.md`), BossPickSeoul prod 는 `.13` 에서 "옮기는" 것이 아니라 미니PC 에 처음 배포하는 일로 봅니다. 실제로 `.13` 에 BossPickSeoul prod 가 떠 있었는지는 확인하지 않았습니다.
 
@@ -187,7 +187,7 @@ prod 호스트는 2026-10-01 에 `.13` 에서 바뀌었습니다. 포트와 도�
 | 백엔드 auth (단독) | dev | `192.168.0.11` | 7081 | `api-dev.hondigagae.com` |
 | 백엔드 auth (단독) | prod | `192.168.0.9` backend-server | 5081 | `api.hondigagae.com` |
 | 프론트 웹 | dev | `192.168.0.11` | 7300 | `dev.hondigagae.com` |
-| 프론트 웹 | prod | 미정 | 5300 | `www.hondigagae.com` |
+| 프론트 웹 | prod | `192.168.0.9` backend-server | 5300 | `www.hondigagae.com` |
 
 prod 호스트는 BossPickSeoul 과 같은 이유로 2026-10-01 에 바뀌었습니다(§5). 포트와 도메인은 그대로입니다.
 
