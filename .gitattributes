@@ -1,0 +1,9 @@
+# 이 저장소의 파일은 모두 Linux 호스트에서 실행·마운트된다.
+# Windows(core.autocrlf=true) 체크아웃에서 .sh 가 CRLF 로 풀리면
+# `/bin/bash^M: bad interpreter` 로 깨지므로 텍스트는 항상 LF 로 체크아웃한다. (#17)
+* text=auto eol=lf
+
+# 바이너리
+*.png binary
+*.jpg binary
+*.jks binary
