@@ -28,7 +28,7 @@ backend-1 (dev 배포 대상 2 — 2026-10-01 prod 에서 변경)
 
 backend-server (prod 배포 대상 — 192.168.0.9, 2026-10-10 세팅)
 ├── backend-prod-agent              # label: deploy-backend-prod (2026-10-10 기동)
-└── frontend-prod-agent             # label: deploy-frontend-prod (혼디가개 프론트 prod)
+└── frontend-prod-agent             # label: deploy-frontend-prod (2026-10-10 기동, 혼디가개 프론트 prod)
 ```
 
 빌더는 하나를 공유하고(캐시 볼륨 때문), deploy agent 는 backend/frontend 로 나눕니다(담당 분리·executor 경합 방지). 자세한 근거는 아래 "노드/라벨 배치" 절을 참고합니다.
@@ -184,7 +184,7 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
 | `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | **미기동 — 컨테이너 추가 필요** |
 | `backend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-backend-prod` | 백엔드 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
-| `frontend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | **미기동 — Jenkins 노드 생성 대기** (env 파일 준비됨) |
+| `frontend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
 
 2026-10-01 에 backend-1 이 prod 에서 dev 서버 2 로 바뀌었습니다(루트 `README.md` §1). prod agent 두 개는 기동된 적이 없어 옮길 컨테이너는 없고, 띄울 위치만 백엔드 prod 전용으로 새로 들인 미니PC 로 바꿨습니다. 라벨은 그대로입니다. 미니PC 는 2026-10-10 에 `backend-server`(`192.168.0.9`)로 세팅했고 `backend-prod-agent` 를 띄웠습니다. `frontend-prod-agent` 도 같은 호스트에 둡니다(혼디가개 프론트 prod, 2026-10-10 결정).
 
