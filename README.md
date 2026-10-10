@@ -12,6 +12,8 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 
 **성격** 열은 `2026-10-01` 에 갱신했습니다. `.13` 의 역할이 prod 에서 dev 로 바뀌었고, 백엔드 prod 전용 미니PC 를 새로 들였습니다. 이때 메모리는 다시 재지 않았습니다 — `.13` 의 6.4Gi 는 TripMarble prod 5종이 떠 있던 때의 값입니다.
 
+`backend-server` 행은 `2026-10-10` 세팅 직후 실측값입니다 (컨테이너는 `backend-prod-agent` 하나).
+
 | 호스트 | IP | CPU | 총 메모리 | available | swap | 성격 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ollama-01` | `192.168.0.10` | x86_64 / Ryzen 7 8845HS | 30Gi | 13Gi | 8Gi | AI · 빌드 · 시크릿 · 메시징 |
@@ -19,11 +21,11 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `storage` | `192.168.0.12` | aarch64 / Cortex-A76 | **1.9Gi** | 1.1Gi | **0** | 인그레스 · 오브젝트 스토리지 |
 | `backend-1` | `192.168.0.13` | aarch64 | 7.7Gi | **6.4Gi** | 2.0Gi | **dev 애플리케이션 2** (2026-10-01 prod → dev 변경) |
 | `deploy` (모니터링) | `192.168.0.14` | 미실측 | 미실측 | 미실측 | 미실측 | Grafana · Prometheus |
-| 신규 미니PC (호스트명 미정) | 미정 | 미실측 | 미실측 | 미실측 | 미실측 | **백엔드 prod 전용** — 2026-10-01 기준 미세팅 |
+| `backend-server` | `192.168.0.9` | x86_64 | 12.6Gi | 11Gi | 4.0Gi | **백엔드 prod 전용** (2026-10-10 세팅) |
 
 > `ollama-01`의 총 `30Gi`는 2026-08-14 측정값입니다. RAM 32GB(decimal)는 약 29.8GiB이므로 이 수치만으로 BIOS UMA가 2GB인지 8GB인지 판단할 수 없습니다. 현재 `MemTotal`과 `mem_info_vram_total`을 다시 측정합니다. API 모델은 `gpt-oss:20b`이며, 자원 예산과 UMA 비교 절차는 [ollama-01 안정화 가이드](ollama/HOST-STABILITY.md)를 따릅니다.
 
-> **아키텍처**: `ollama-01` 만 x86_64 이고 나머지 라즈베리파이 계열은 aarch64 입니다. Jenkins 빌더가 `ollama-01` 에 있으므로 **네이티브 바이너리가 포함되는 산출물은 그대로 배포하면 안 됩니다.** JAR 은 무관하지만 Node/Python 산출물은 영향을 받습니다. 신규 미니PC 의 아키텍처는 아직 확인하지 않았습니다.
+> **아키텍처**: `ollama-01` 과 `backend-server` 는 x86_64 이고 나머지 라즈베리파이 계열은 aarch64 입니다. Jenkins 빌더가 `ollama-01` 에 있으므로 **aarch64 호스트(`.11` · `.12` · `.13`)에는 네이티브 바이너리가 포함되는 산출물을 그대로 배포하면 안 됩니다.** JAR 은 무관하지만 Node/Python 산출물은 영향을 받습니다. prod 백엔드가 가는 `backend-server` 는 빌더와 같은 x86_64 라 이 문제가 없습니다.
 
 ---
 
@@ -36,7 +38,9 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
 | `192.168.0.13` backend-1 | sneezecast **dev 백엔드**(예정), backend-dev2-agent(예정), redis-node2 + sentinel2 |
 | `192.168.0.14` deploy | grafana, prometheus, node-exporter |
-| 신규 미니PC (IP 미정) | 미세팅 — 각 프로젝트 **prod 백엔드** 예정 |
+| `192.168.0.9` backend-server | docker, backend-prod-agent — 각 프로젝트 **prod 백엔드** 배포 대상 (2026-10-10 기동) |
+
+**혼디가개 prod DB 는 `backend-server` 가 아니라 `.11` main-server 의 mysql 에 있습니다** (스키마 `hondigagae_{auth,tour,plan}_prod`, 2026-10-10 생성). 아래 4절 2번 "dev 와 prod 는 호스트를 공유하지 않는다" 의 예외로, 애플리케이션은 분리하고 DB 인스턴스만 dev 와 함께 씁니다. 그래서 `.11` mysql 의 재시작 · 디스크 · 백업이 prod 에도 영향을 줍니다.
 
 `.13` 에 있던 prod 배포(TripMarble prod 백엔드 5종 포함)는 2026-10-01 에 모두 내렸습니다. **사용자 진술 기준이며 `docker ps` 로 실측하지 않았습니다.** redis-node2 + sentinel2 는 내렸다는 진술이 없어 그대로 있는 것으로 보고 남겨 둡니다.
 
@@ -46,7 +50,7 @@ Redis 는 3노드 센티널이라 `.11` / `.13` / `.12` 에 한 대씩 나눠 �
 
 ## 3. BossPickSeoul 운영 백엔드는 어디에 두는가
 
-> **2026-10-01 갱신 — 결론이 바뀌었습니다.** 백엔드 prod 는 `.13` 이 아니라 새로 들인 **백엔드 prod 전용 미니PC**(IP · 호스트명 미정, 미세팅)로 갑니다. `.13` 은 dev 서버 2 가 되었습니다.
+> **2026-10-01 갱신 — 결론이 바뀌었습니다.** 백엔드 prod 는 `.13` 이 아니라 새로 들인 **백엔드 prod 전용 미니PC**(`backend-server`, `192.168.0.9` — 2026-10-10 세팅)로 갑니다. `.13` 은 dev 서버 2 가 되었습니다.
 > 아래 "2026-08-14 당시 결론" 부터 "향후 이전" 까지는 **당시 판단 기록**으로 남겨 둡니다. 지우지 않는 이유는 근거 일부가 지금도 유효하기 때문입니다.
 
 ### 2026-10-01 기준으로 유효한 것과 아닌 것
@@ -62,12 +66,12 @@ Redis 는 3노드 센티널이라 `.11` / `.13` / `.12` 에 한 대씩 나눠 �
 
 ### 후속 작업 — 배선이 아직 `.13` 을 가리킵니다
 
-아래 파일들은 이 갱신에서 **고치지 않았습니다.** 미니PC IP 가 정해지면 함께 바꿉니다.
+아래 파일들은 이 갱신에서 **고치지 않았습니다.** 미니PC IP 는 `192.168.0.9` 로 정해졌지만(2026-10-10), 배선은 각 서비스를 실제로 prod 에 배포할 때 바꿉니다.
 
 - `nginx/conf.d/api.bosspickseoul.conf` 의 `upstream` 2줄이 `192.168.0.13:9000`(게이트웨이), `192.168.0.13:9081`(auth) 을 봅니다. 운영 프론트 `nginx/conf.d/bosspickseoul.conf` 는 `192.168.0.13:9300` 입니다(프론트 prod 위치는 미정).
 - 혼디가개도 같습니다 — `api.hondigagae.conf`(5000 / 5081), `hondigagae.conf`(5300).
 - Prometheus `monitoring/prometheus/targets/nodes.yml` 에 `backend-1` 이 `role: backend`, `project: bosspickseoul` 로 등록되어 있습니다. 역할이 dev 2 로 바뀌었으니 라벨을 갱신해야 합니다. `bosspickseoul-*-prod.yml` 의 대상 IP 도 미니PC 로 바꿉니다.
-- Jenkins `backend-prod-agent` / `frontend-prod-agent` 는 미니PC 에 띄웁니다(`jenkins/README.md` 노드/라벨 표).
+- Jenkins `backend-prod-agent` 는 2026-10-10 에 미니PC 에 기동했습니다. `frontend-prod-agent` 는 프론트 prod 위치가 정해지면 띄웁니다(`jenkins/README.md` 노드/라벨 표).
 
 문서상 `backend-prod-agent` 는 한 번도 기동된 적이 없으므로(`jenkins/README.md`), BossPickSeoul prod 는 `.13` 에서 "옮기는" 것이 아니라 미니PC 에 처음 배포하는 일로 봅니다. 실제로 `.13` 에 BossPickSeoul prod 가 떠 있었는지는 확인하지 않았습니다.
 
@@ -133,7 +137,7 @@ nginx 가 `.12` 에 있어 외부 진입은 어차피 1홉이지만, 게이트�
 새 컴포넌트를 어디 둘지 정할 때 적용하는 규칙입니다.
 
 1. **`storage`(`.12`) 에는 더 얹지 않습니다.** 총 1.9Gi / swap 0 이고 전 도메인의 단일 인그레스입니다. 여기서 나는 OOM 은 그 컴포넌트만의 문제로 끝나지 않습니다.
-2. **dev 와 prod 는 호스트를 공유하지 않습니다.** dev 호스트는 `.11` · `.13`, prod 는 백엔드 전용 미니PC 입니다(2026-10-01 변경, 미니PC 는 미세팅). dev 배포 한 번의 OOM 이 운영을 죽이지 않게 하려는 규칙입니다.
+2. **dev 와 prod 는 호스트를 공유하지 않습니다.** dev 호스트는 `.11` · `.13`, prod 는 백엔드 전용 미니PC `backend-server`(`.9`) 입니다(2026-10-01 변경, 2026-10-10 세팅). dev 배포 한 번의 OOM 이 운영을 죽이지 않게 하려는 규칙입니다.
 3. **`ollama-01`(`.10`) 은 인프라 계층 전용입니다.** 빌드·시크릿·메시징·AI. 사용자 트래픽을 받는 애플리케이션은 두지 않습니다.
 4. **호스트 간 통신은 컨테이너명이 아니라 사설 IP** 를 씁니다. `8llow8llowme-net` 은 호스트별 브리지라 다른 호스트의 컨테이너명이 해석되지 않습니다. 과거 `web-ssr:3000` 으로 프록시했다가 같은 호스트의 tripmarble 컨테이너가 BossPickSeoul 요청에 응답한 사고가 있었습니다.
 5. **포트 대역을 지킵니다.**
@@ -160,9 +164,9 @@ nginx 가 `.12` 에 있어 외부 진입은 어차피 1홉이지만, 게이트�
 | 대상 | 환경 | 호스트 | 호스트 포트 | 도메인 |
 | --- | --- | --- | --- | --- |
 | 백엔드 게이트웨이 | dev | `192.168.0.11` | 6000 | `api-dev.bosspickseoul.com` |
-| 백엔드 게이트웨이 | prod | 신규 미니PC (IP 미정) | 9000 | `api.bosspickseoul.com` |
+| 백엔드 게이트웨이 | prod | `192.168.0.9` backend-server | 9000 | `api.bosspickseoul.com` |
 | 백엔드 auth (단독) | dev | `192.168.0.11` | 6081 | `api-dev.bosspickseoul.com` |
-| 백엔드 auth (단독) | prod | 신규 미니PC (IP 미정) | 9081 | `api.bosspickseoul.com` |
+| 백엔드 auth (단독) | prod | `192.168.0.9` backend-server | 9081 | `api.bosspickseoul.com` |
 | 프론트 웹 | dev | `192.168.0.11` | 6300 | `dev.bosspickseoul.com` |
 | 프론트 웹 | prod | 미정 | 9300 | `www.bosspickseoul.com` |
 
@@ -179,9 +183,9 @@ prod 호스트는 2026-10-01 에 `.13` 에서 바뀌었습니다. 포트와 도�
 | 대상 | 환경 | 호스트 | 호스트 포트 | 도메인 |
 | --- | --- | --- | --- | --- |
 | 백엔드 게이트웨이 | dev | `192.168.0.11` | 7000 | `api-dev.hondigagae.com` |
-| 백엔드 게이트웨이 | prod | 신규 미니PC (IP 미정) | 5000 | `api.hondigagae.com` |
+| 백엔드 게이트웨이 | prod | `192.168.0.9` backend-server | 5000 | `api.hondigagae.com` |
 | 백엔드 auth (단독) | dev | `192.168.0.11` | 7081 | `api-dev.hondigagae.com` |
-| 백엔드 auth (단독) | prod | 신규 미니PC (IP 미정) | 5081 | `api.hondigagae.com` |
+| 백엔드 auth (단독) | prod | `192.168.0.9` backend-server | 5081 | `api.hondigagae.com` |
 | 프론트 웹 | dev | `192.168.0.11` | 7300 | `dev.hondigagae.com` |
 | 프론트 웹 | prod | 미정 | 5300 | `www.hondigagae.com` |
 
@@ -211,9 +215,9 @@ Jenkins credential(`hondigagae-vault-*`), 배포 lock(`hondigagae-backend-deploy
 | 대상 | 환경 | 호스트 | 호스트 포트 | 도메인 |
 | --- | --- | --- | --- | --- |
 | 백엔드 게이트웨이 | dev | `192.168.0.13` | 3000 | `api-dev.sneezecast.com` |
-| 백엔드 게이트웨이 | prod | 신규 미니PC (IP 미정) | 4000 | `api.sneezecast.com` |
+| 백엔드 게이트웨이 | prod | `192.168.0.9` backend-server | 4000 | `api.sneezecast.com` |
 | 백엔드 auth | dev | `192.168.0.13` | 3081 | `api-dev.sneezecast.com` |
-| 백엔드 auth | prod | 신규 미니PC (IP 미정) | 4081 | `api.sneezecast.com` |
+| 백엔드 auth | prod | `192.168.0.9` backend-server | 4081 | `api.sneezecast.com` |
 | 프론트 웹 | dev | 미정 | 3300 | `dev.sneezecast.com` |
 | 프론트 웹 | prod | 미정 | 4300 | `www.sneezecast.com` |
 
