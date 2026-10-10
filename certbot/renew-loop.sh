@@ -47,13 +47,19 @@ trap 'echo "[certbot] stopping"; exit 0' TERM INT
 while :; do
   ensure_tls_defaults
 
+  # 갱신 실패로 스크립트가 종료되면 restart: always 로 즉시 재시작되어
+  # Let's Encrypt 요청이 폭주하고 계정이 rate limit 에 걸립니다.
+  # 실패해도 로그만 남기고 다음 주기까지 대기합니다.
   echo "[certbot] renewal check started"
-  certbot renew \
+  if certbot renew \
     --webroot -w "${WEBROOT}" \
     --quiet \
     --disable-hook-validation \
-    --deploy-hook "/usr/local/bin/renew-loop.sh reload"
-  echo "[certbot] renewal check finished; sleeping ${RENEW_INTERVAL}"
+    --deploy-hook "/usr/local/bin/renew-loop.sh reload"; then
+    echo "[certbot] renewal check finished; sleeping ${RENEW_INTERVAL}"
+  else
+    echo "[certbot] renewal check failed (exit $?); retry after ${RENEW_INTERVAL}" >&2
+  fi
 
   # 7. 종료 신호를 받을 수 있도록 sleep을 별도 프로세스로 실행합니다.
   sleep "${RENEW_INTERVAL}" &
