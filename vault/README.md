@@ -872,21 +872,24 @@ sneezecast 도 **같은 Vault 인스턴스와 같은 `kv` mount 를 공유**하�
 Vault 를 새로 띄우거나 다시 초기화할 필요가 없습니다.
 
 ```text
-kv/sneezecast/backend/{env}/env                    # 공통 — 둘 이상의 서비스가 같은 값을 써야 하는 키
-kv/sneezecast/backend/{env}/api-gateway
-kv/sneezecast/backend/{env}/auth-service
-kv/sneezecast/backend/{env}/surveillance-service   # REPORTER_KEY_PEPPER 는 여기에만
-kv/sneezecast/backend/{env}/batch-service
-kv/sneezecast/frontend/{env}/env                   # 프론트가 생기면
+kv/sneezecast/backend/{env}/common/env                 # 공통 — 둘 이상의 서비스가 같은 값을 써야 하는 키
+kv/sneezecast/backend/{env}/api-gateway/env
+kv/sneezecast/backend/{env}/auth-service/env           # WITHDRAWN_EMAIL_PEPPER 는 여기에만
+kv/sneezecast/backend/{env}/surveillance-service/env   # REPORTER_KEY_PEPPER 는 여기에만
+kv/sneezecast/backend/{env}/batch-service/env
+kv/sneezecast/frontend/{env}/env                       # 프론트가 생기면
 ```
 
 `{env}` 는 `dev` / `prod` 입니다. service-discovery 는 공통 secret 만 읽으므로 서비스 경로가 없습니다.
-서비스 경로 이름은 파이프라인 설정의 `serviceName`(모듈 디렉터리 이름)과 같게 둡니다.
+서비스 폴더 이름은 파이프라인 설정의 `serviceName`(모듈 디렉터리 이름)과 같게 둡니다.
+
+secret 은 모두 `env` 로 끝납니다. Web UI 의 `{env}/` 아래에는 `common` 과 서비스 폴더만 보여서 공통 secret 이
+서비스 이름처럼 읽히지 않습니다 (sneezecast#273 에서 `{env}/env` · `{env}/{service}` 를 이 모양으로 옮김).
 
 ### 혼디가개와 다른 점 — 공통 + 서비스별 두 층
 
-혼디가개는 환경당 secret 하나(`{env}/env`)에 전 서비스의 키를 모읍니다. sneezecast 는 그 `{env}/env` 를
-**공통 secret** 으로 그대로 쓰고, 한 서비스만 쓰는 키는 서비스 경로로 뺍니다.
+혼디가개는 환경당 secret 하나(`{env}/env`)에 전 서비스의 키를 모읍니다. sneezecast 는 그 역할을
+**공통 secret**(`{env}/common/env`)이 맡고, 한 서비스만 쓰는 키는 서비스 경로(`{env}/{service}/env`)로 뺍니다.
 
 - **공통 키는 한 곳에만 둡니다.** `JWT_ACCESS_KEY` 는 게이트웨이 · auth · surveillance 가 같은 항목을 읽습니다.
   서비스 경로에 복사본을 두지 않습니다 — 길이는 맞고 값만 다른 키가 들어가면 기동 검사는 통과하고 모든
@@ -900,7 +903,7 @@ kv/sneezecast/frontend/{env}/env                   # 프론트가 생기면
 
 #### 파이프라인 — 앱 레포에 구현됨 (sneezecast#10)
 
-앱 레포 `Jenkinsfile.backend-common.groovy` 가 잡마다 `{root}/{env}/env` 와 `{root}/{env}/{serviceName}` 을 읽어
+앱 레포 `Jenkinsfile.backend-common.groovy` 가 잡마다 `{root}/{env}/common/env` 와 `{root}/{env}/{serviceName}/env` 를 읽어
 합친 뒤 `.env.runtime` 을 만듭니다. 상세는 앱 레포 `backend/docs/deploy-guide.md` 입니다.
 
 - 서비스 경로는 잡의 `serviceName` 으로만 조립합니다(경로를 바꾸는 빌드 파라미터 없음). service-discovery 는 공통만 읽습니다.
@@ -937,10 +940,10 @@ sneezecast 파이프라인은 **`$` 가 든 값과 따옴표(`"` · `'`)로 감�
 - CLI: `kv put` 은 secret 전체를 **덮어씁니다.** 키 하나만 바꾸려면 `kv patch` 를 씁니다.
 
 ```bash
-docker exec -it vault vault kv put -mount="kv" sneezecast/backend/dev/env \
+docker exec -it vault vault kv put -mount="kv" sneezecast/backend/dev/common/env \
   SPRING_PROFILES_ACTIVE=dev REDIS_KEY_PREFIX=sneezecast:dev ...
-docker exec -it vault vault kv patch -mount="kv" sneezecast/backend/dev/auth-service AUTH_DB_PASSWORD=...
-docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
+docker exec -it vault vault kv patch -mount="kv" sneezecast/backend/dev/auth-service/env AUTH_DB_PASSWORD=...
+docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/common/env
 ```
 
 생성해야 하는 무작위 값 (환경마다 따로 만들고, BossPickSeoul · 혼디가개 값과도 다르게 둡니다):
@@ -959,7 +962,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 `Jenkinsfile-<service>` 의 `requiredEnvKeys` 입니다 (develop `5ee71ad`, 2026-10-11). **필수**는 기본값이 없는 키로, 없으면 기동하지 못합니다. **기본값**이 있는 키는
 넣지 않아도 되고, 표의 dev 값을 비워 둔 것은 기본값을 그대로 쓴다는 뜻입니다.
 
-#### 공통 — `kv/sneezecast/backend/{env}/env`
+#### 공통 — `kv/sneezecast/backend/{env}/common/env`
 
 | key | 쓰는 서비스 | 필수 / 기본값 | dev 값 | 비고 |
 | --- | --- | --- | --- | --- |
@@ -978,7 +981,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 `SPRING_APPLICATION_NAME`(5종, 기본값은 각 서비스 이름)은 서비스마다 값이 달라 secret 에 한 키로 둘 수
 없습니다. 넣지 않고 기본값을 쓰거나, compose 가 `*_SERVICE_APP_NAME` 을 컨테이너별로 넘깁니다(혼디가개 방식).
 
-#### api-gateway — `kv/sneezecast/backend/{env}/api-gateway`
+#### api-gateway — `kv/sneezecast/backend/{env}/api-gateway/env`
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
@@ -988,7 +991,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `GATEWAY_RESPONSE_TIMEOUT` | 기본값 `10s` | |
 | `JWT_BLACKLIST_FAIL_OPEN` | 기본값 `false` | 넣지 않는다. `true` 면 Redis 장애 때 폐기 토큰이 통과한다 |
 
-#### auth-service — `kv/sneezecast/backend/{env}/auth-service`
+#### auth-service — `kv/sneezecast/backend/{env}/auth-service/env`
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
@@ -1020,7 +1023,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `AUTH_OAUTH_AUTHORIZE_IP_MAX_COUNT` / `AUTH_OAUTH_AUTHORIZE_IP_WINDOW` | 기본값 `30` / `PT10M` | 카카오 인가 시작(authorize) IP 상한 |
 | `WITHDRAWN_EMAIL_PEPPER` | 필수 | 생성 (위 표). 탈퇴 회원 이메일 다이제스트(HMAC-SHA256) 키. **auth 경로에만** 두고 교체 금지, 오프라인 사본 한 부 (sneezecast#154). 파이프라인이 서비스 전용 키로 검사한다 |
 
-#### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
+#### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service/env`
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
@@ -1029,7 +1032,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `SURVEILLANCE_DB_USERNAME` / `SURVEILLANCE_DB_PASSWORD` | 필수 | auth 와 **다른** 계정 |
 | `REPORTER_KEY_PEPPER` | 필수 | 생성 (위 표). **이 경로에만** 둔다 |
 
-#### batch-service — `kv/sneezecast/backend/{env}/batch-service`
+#### batch-service — `kv/sneezecast/backend/{env}/batch-service/env`
 
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
@@ -1038,8 +1041,11 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `BATCH_DB_USERNAME` / `BATCH_DB_PASSWORD` | 필수 | 적재 전용 계정. surveillance-service 계정과 다르다 |
 | `BATCH_SCHEDULE_ENABLED` | 기본값 dev `true` / prod `false` | prod 는 첫 적재를 dev 에서 관찰한 뒤 켠다 |
 
-외부 API 키(SGIS · 공공데이터포털)는 아직 yml 에 자리표시자가 없습니다. 생기는 이슈에서 batch-service
-경로와 이 표에 함께 추가합니다.
+| `SGIS_CONSUMER_KEY` / `SGIS_CONSUMER_SECRET` | 선택 (빈 값) | SGIS 오픈API 인증키 (districtImportJob). 비어도 기동하고, 잡 실행 때 `SGIS_CREDENTIALS_MISSING` 으로 실패 |
+| `KDCA_API_SERVICE_KEY` | 선택 (빈 값) | 공공데이터포털 질병관리청 API 키 (notifiableImportJob). 포털의 **Decoding** 값. 비어도 기동한다 |
+
+⚠️ 2026-10-11 기준 앱 레포 batch compose 의 `environment` 에 위 세 키가 없어, Vault 에 넣어도 컨테이너로
+넘어가지 않습니다. compose 에 키를 더하는 앱 레포 이슈가 머지된 뒤 넣습니다.
 
 ### REPORTER_KEY_PEPPER — 교체 금지
 
@@ -1060,15 +1066,17 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 - 서버 `~/infra` 는 git checkout 이 아니라 파일 사본입니다. sneezecast 정책 · 스크립트는 `scp` 로 올렸습니다.
   `.hcl` 을 고치면 같은 방법으로 올린 뒤 bootstrap 을 다시 돌립니다.
 - dev 경로 5개를 만들었습니다. 무작위 값(위 표)은 서버에서 생성해 바로 넣었고, 나머지는 위 키 표의 dev 값입니다.
+  처음엔 `dev/env` · `dev/{service}` 로 만들었다가 같은 날 `dev/common/env` · `dev/{service}/env` 로 옮겼습니다
+  (sneezecast#273, 값 그대로 — 복사 후 해시 대조, 옛 경로 metadata 삭제).
   **아래 키는 비어 있습니다 — Web UI 에서 해당 secret 을 열고 `Create new version` 으로 추가합니다**
   (기존 키를 지우지 않도록 JSON 보기에서 키를 덧붙입니다. CLI 면 `kv patch`).
 
 | 경로 | 비어 있는 필수 키 | 값 출처 |
 | --- | --- | --- |
-| `env` | `REDIS_PASSWORD` | 팀 Redis requirepass (혼디가개 secret 과 같은 값) |
-| `auth-service` | `MINIO_ENDPOINT` · `MINIO_PUBLIC_URL` · `MINIO_ACCESS_KEY` · `MINIO_SECRET_KEY` | storage MinIO (혼디가개 secret 과 같은 값, 또는 sneezecast 전용 access key) |
-| `auth-service` | `MAIL_USERNAME` · `MAIL_PASSWORD` | 인증 메일 SMTP 계정 |
-| `auth-service` | `KAKAO_CLIENT_ID` · `KAKAO_CLIENT_SECRET` | sneezecast 카카오 앱. 콘솔에 `KAKAO_REDIRECT_URI` 값(이미 넣음)을 등록 |
+| `common/env` | `REDIS_PASSWORD` | 팀 Redis requirepass (혼디가개 secret 과 같은 값) |
+| `auth-service/env` | `MINIO_ENDPOINT` · `MINIO_PUBLIC_URL` · `MINIO_ACCESS_KEY` · `MINIO_SECRET_KEY` | storage MinIO (혼디가개 secret 과 같은 값, 또는 sneezecast 전용 access key) |
+| `auth-service/env` | `MAIL_USERNAME` · `MAIL_PASSWORD` | 인증 메일 SMTP 계정 |
+| `auth-service/env` | `KAKAO_CLIENT_ID` · `KAKAO_CLIENT_SECRET` | sneezecast 카카오 앱. 콘솔에 `KAKAO_REDIRECT_URI` 값(이미 넣음)을 등록 |
 
 - DB 비밀번호 세 개는 Vault 에 넣었지만 **MySQL 계정은 아직 없습니다.** 앱 레포 deploy-guide §8 SQL 을
   Vault 의 `*_DB_PASSWORD` 값으로 실행합니다. MinIO 버킷 `sneezecast` 도 따로 만듭니다.
