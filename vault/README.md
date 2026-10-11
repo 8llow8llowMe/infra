@@ -950,11 +950,13 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `JWT_ACCESS_KEY` | `openssl rand -base64 64 \| tr -d '\n'` (88자) | UTF-8 64바이트 이상, 공백 금지. 미달이면 기동 실패 |
 | `JWT_REFRESH_KEY` | 같은 명령으로 **따로** 생성 | 위와 같음. access 키와 다른 값 |
 | `REPORTER_KEY_PEPPER` | `openssl rand -base64 48 \| tr -d '\n'` (64자) | 32자 이상. 미달이면 기동 실패. **교체 금지** (아래) |
+| `WITHDRAWN_EMAIL_PEPPER` | 같은 명령으로 **따로** 생성 (64자) | 32자 이상. 미달이면 기동 실패. **교체 금지** — 탈퇴 회원 이메일 다이제스트의 키라 바꾸면 기존 탈퇴 행과 대조할 수 없다 |
+| `AUTH_DB_PASSWORD` · `SURVEILLANCE_DB_PASSWORD` · `BATCH_DB_PASSWORD` | `openssl rand -base64 24 \| tr -d '\n'` (32자) | 계정마다 따로. MySQL `CREATE USER` 에 같은 값을 쓴다 (앱 레포 deploy-guide §8 SQL) |
 
 ### 키 표
 
-기준은 앱 레포 각 모듈 `src/main/resources/application*.yml` 의 `${...}` 자리표시자입니다
-(develop `942482a`, 2026-10-01). **필수**는 기본값이 없는 키로, 없으면 기동하지 못합니다. **기본값**이 있는 키는
+기준은 앱 레포 각 모듈 `src/main/resources/application*.yml` 의 `${...}` 자리표시자와 잡별
+`Jenkinsfile-<service>` 의 `requiredEnvKeys` 입니다 (develop `5ee71ad`, 2026-10-11). **필수**는 기본값이 없는 키로, 없으면 기동하지 못합니다. **기본값**이 있는 키는
 넣지 않아도 되고, 표의 dev 값을 비워 둔 것은 기본값을 그대로 쓴다는 뜻입니다.
 
 #### 공통 — `kv/sneezecast/backend/{env}/env`
@@ -981,6 +983,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
 | `API_GATEWAY_PORT` | 필수 | `3000`(prod `4000`). **컨테이너 내부 포트 = 호스트 포트** — 파이프라인이 잡의 `hostPorts` 와 대조 |
+| `GATEWAY_TRUSTED_PROXIES` | 필수 | dev `192.168.0.12`(nginx), prod 는 prod nginx 사설 IP(미정). IP · CIDR 만 받는다. 틀려도 기동은 되지만 nginx 경유 요청이 nginx IP 한 키를 나눠 써 auth IP 상한이 전체에 걸린다 |
 | `GATEWAY_CONNECT_TIMEOUT_MS` | 기본값 `2000` | |
 | `GATEWAY_RESPONSE_TIMEOUT` | 기본값 `10s` | |
 | `JWT_BLACKLIST_FAIL_OPEN` | 기본값 `false` | 넣지 않는다. `true` 면 Redis 장애 때 폐기 토큰이 통과한다 |
@@ -990,7 +993,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
 | `AUTH_SERVICE_PORT` | 필수 | `3081`(prod `4081`). 내부 포트 = 호스트 포트. 호스트에는 `127.0.0.1` 로만 publish (LAN 비노출) |
-| `AUTH_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/sneezecast_auth?...` (URL 옵션은 혼디가개 secret 과 같게) |
+| `AUTH_DB_URL` | 필수 | dev: `jdbc:mysql://192.168.0.11:3306/sneezecast_auth?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true` |
 | `AUTH_DB_USERNAME` / `AUTH_DB_PASSWORD` | 필수 | `sneezecast_auth` 스키마 전용 계정 |
 | `JWT_REFRESH_KEY` | 필수 | 생성 (위 표). auth 만 쓰므로 공통이 아니다 |
 | `JWT_ACCESS_EXPIRATION` | 기본값 `PT15M` | 15분을 넘기면 기동 실패 |
@@ -1015,6 +1018,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | `KAKAO_CONNECT_TIMEOUT` / `KAKAO_READ_TIMEOUT` | 기본값 `PT1S` / `PT2S` | 카카오 API timeout. 로그인 한 번에 두 번 부르므로 합계가 게이트웨이 response-timeout(10초)보다 짧게 둔다 |
 | `AUTH_OAUTH_STATE_TTL` · `AUTH_OAUTH_SIGNUP_TICKET_TTL` · `AUTH_OAUTH_LINK_TICKET_TTL` | 기본값 `PT10M` · `PT30M` · `PT10M` | 카카오 로그인 state · 신규 가입표 · 기존 계정 연결 확인표 수명 |
 | `AUTH_OAUTH_AUTHORIZE_IP_MAX_COUNT` / `AUTH_OAUTH_AUTHORIZE_IP_WINDOW` | 기본값 `30` / `PT10M` | 카카오 인가 시작(authorize) IP 상한 |
+| `WITHDRAWN_EMAIL_PEPPER` | 필수 | 생성 (위 표). 탈퇴 회원 이메일 다이제스트(HMAC-SHA256) 키. **auth 경로에만** 두고 교체 금지, 오프라인 사본 한 부 (sneezecast#154). 파이프라인이 서비스 전용 키로 검사한다 |
 
 #### surveillance-service — `kv/sneezecast/backend/{env}/surveillance-service`
 
@@ -1030,7 +1034,7 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 | key | 필수 / 기본값 | 비고 |
 | --- | --- | --- |
 | `BATCH_SERVICE_PORT` | 필수 | `3080`(prod `4080`). 내부 포트 = 호스트 포트. 호스트에는 `127.0.0.1` 로만 publish |
-| `BATCH_DB_URL` | 필수 | `sneezecast_surveillance` 스키마 (적재 대상 + `BATCH_*` 메타 테이블) |
+| `BATCH_DB_URL` | 필수 | `sneezecast_surveillance` 스키마 (적재 대상 + `BATCH_*` 메타 테이블). dev 는 auth 와 같은 URL 옵션에 `&rewriteBatchedStatements=true` |
 | `BATCH_DB_USERNAME` / `BATCH_DB_PASSWORD` | 필수 | 적재 전용 계정. surveillance-service 계정과 다르다 |
 | `BATCH_SCHEDULE_ENABLED` | 기본값 dev `true` / prod `false` | prod 는 첫 적재를 dev 에서 관찰한 뒤 켠다 |
 
@@ -1046,6 +1050,30 @@ docker exec -it vault vault kv get -mount="kv" sneezecast/backend/dev/env
 - **32자 이상 무작위**로 만들고(위 표의 `openssl` 명령), dev 와 prod 는 다른 값을 씁니다.
 - 공통 경로 · auth-service 경로에 두지 않습니다.
 - 기동 로그에는 SHA-256 앞 8자 지문만 남습니다. 값이 바뀌지 않았는지는 배포 전후 지문으로 확인합니다.
+
+`WITHDRAWN_EMAIL_PEPPER`(auth 경로)도 같은 규칙입니다 — 교체 · 분실 불가, 오프라인 사본 한 부, dev · prod 다른 값.
+
+### 적용 현황 (dev, 2026-10-11 · infra#25)
+
+- ai-host 에 정책 3개 · AppRole 2개를 bootstrap 으로 반영했고, Web UI 계정 `followfollowme` 에 `ui-sneezecast` 를
+  붙였습니다(정책: `ui-bosspickseoul,ui-hondigagae,ui-sneezecast`). UI 의 `kv` mount 에서 `sneezecast/` 가 보입니다.
+- 서버 `~/infra` 는 git checkout 이 아니라 파일 사본입니다. sneezecast 정책 · 스크립트는 `scp` 로 올렸습니다.
+  `.hcl` 을 고치면 같은 방법으로 올린 뒤 bootstrap 을 다시 돌립니다.
+- dev 경로 5개를 만들었습니다. 무작위 값(위 표)은 서버에서 생성해 바로 넣었고, 나머지는 위 키 표의 dev 값입니다.
+  **아래 키는 비어 있습니다 — Web UI 에서 해당 secret 을 열고 `Create new version` 으로 추가합니다**
+  (기존 키를 지우지 않도록 JSON 보기에서 키를 덧붙입니다. CLI 면 `kv patch`).
+
+| 경로 | 비어 있는 필수 키 | 값 출처 |
+| --- | --- | --- |
+| `env` | `REDIS_PASSWORD` | 팀 Redis requirepass (혼디가개 secret 과 같은 값) |
+| `auth-service` | `MINIO_ENDPOINT` · `MINIO_PUBLIC_URL` · `MINIO_ACCESS_KEY` · `MINIO_SECRET_KEY` | storage MinIO (혼디가개 secret 과 같은 값, 또는 sneezecast 전용 access key) |
+| `auth-service` | `MAIL_USERNAME` · `MAIL_PASSWORD` | 인증 메일 SMTP 계정 |
+| `auth-service` | `KAKAO_CLIENT_ID` · `KAKAO_CLIENT_SECRET` | sneezecast 카카오 앱. 콘솔에 `KAKAO_REDIRECT_URI` 값(이미 넣음)을 등록 |
+
+- DB 비밀번호 세 개는 Vault 에 넣었지만 **MySQL 계정은 아직 없습니다.** 앱 레포 deploy-guide §8 SQL 을
+  Vault 의 `*_DB_PASSWORD` 값으로 실행합니다. MinIO 버킷 `sneezecast` 도 따로 만듭니다.
+- Jenkins credential(`sneezecast-vault-role-id` / `-secret-id`)은 아직 발급하지 않았습니다(아래 AppRole 절).
+- prod 경로는 만들지 않았습니다.
 
 ## sneezecast Bootstrap
 
