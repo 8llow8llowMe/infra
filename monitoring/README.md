@@ -327,6 +327,21 @@ sh install-promtail.sh
 
 prod는 backend-1(`192.168.0.13`)의 `9xxx` 포트를 사용합니다. 실행하지 않는 서비스는 Prometheus와 Grafana에서 `DOWN`으로 표시됩니다.
 
+## 혼디가개 백엔드 메트릭 수집 (#28)
+
+혼디가개는 7종(`service-discovery`, `api-gateway`, `auth`, `tour`, `plan`, `ai`, `batch`)이고, dev 는 main-server(`.11`) 7xxx, prod 는 backend-server(`.9`) 5xxx 입니다. 포트 정본은 애플리케이션 레포의 `backend/docs/deploy-guide.md` 입니다.
+
+| target 파일 | Prometheus job | 호스트 |
+| --- | --- | --- |
+| `hondigagae-cloud-dev.yml` | `hondigagae-cloud` | `.11` 7761 · 7000 |
+| `hondigagae-cloud-prod.yml` | `hondigagae-cloud` | `.9` 5761 · 5000 |
+| `hondigagae-service-dev.yml` | `hondigagae-service` | `.11` 7081 · 7082 · 7083 · 7085 · 7080 |
+| `hondigagae-service-prod.yml` | `hondigagae-service` | `.9` 5081 · 5082 · 5083 · 5085 · 5080 |
+
+2026-10-12 연결 직후 14개 target 이 모두 up 이었고, Prometheus head series 는 1.5k → 26k 로 늘었습니다(Prometheus 메모리 91Mi).
+
+혼디가개 compose 는 컨테이너마다 `observability.project=hondigagae` 등 관측 라벨을 붙이므로, 같은 호스트의 Promtail 하나로 다른 프로젝트 로그와 구분됩니다. 여러 프로젝트가 같이 쓰는 호스트(`.11`, `.9`)의 Promtail `PROMTAIL_PROJECT` 는 `infra` 로 둡니다. 관측 라벨이 없는 mysql · redis · Jenkins agent 로그가 특정 프로젝트로 잘못 묶이지 않게 하려는 것입니다.
+
 ## Grafana 대시보드 프로비저닝
 
 `grafana/dashboards/BossPickSeoul`의 JSON은 Grafana의 BossPickSeoul 폴더로 자동 프로비저닝됩니다.
@@ -340,7 +355,7 @@ prod는 backend-1(`192.168.0.13`)의 `9xxx` 포트를 사용합니다. 실행하
 | JVM / 런타임 | Prometheus | heap·non-heap, 시스템/프로세스 CPU, load, thread, GC, HikariCP |
 | Executor / Thread Pool | Prometheus | active/queued, pool core·current·max, 완료 처리율, 실행시간 |
 
-다른 프로젝트는 `grafana/dashboard-templates/spring-docker`의 JSON을 복사해 `__PROJECT__`, title, uid를 변경합니다. 프로비저닝된 대시보드는 Grafana UI가 아니라 Git의 JSON을 원본으로 관리합니다.
+프로젝트 대시보드는 `grafana/dashboard-templates/spring-docker/*.template.json` 에서 `grafana/render-dashboards.sh <project> <Folder>` 로 만듭니다(예: `sh render-dashboards.sh hondigagae Hondigagae`). 생성된 JSON 도 커밋하고, 템플릿을 고치면 모든 프로젝트를 다시 렌더링합니다. 지금 렌더링된 폴더는 `BossPickSeoul`, `Hondigagae` 입니다. 프로비저닝된 대시보드는 Grafana UI가 아니라 Git의 JSON을 원본으로 관리합니다.
 
 Grafana는 `grafana/grafana:12.x`를 사용하며, 대시보드는 classic 스키마(schemaVersion 40) + 접이식 row 구조입니다. datasource는 고정 uid `prometheus`, `loki`로 참조합니다. 대시보드 구조와 Grafana 12 전환 세부 사항은 `grafana/README.md`를 참고합니다.
 
