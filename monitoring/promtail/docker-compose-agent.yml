@@ -3,6 +3,8 @@ services:
     image: ${PROMTAIL_IMAGE}
     container_name: ${PROMTAIL_CONTAINER_NAME}
     restart: unless-stopped
+    # 앱 서버의 메모리를 에이전트가 잠식하지 않도록 상한을 둡니다.
+    mem_limit: ${PROMTAIL_MEM_LIMIT:-192m}
     # 환경변수 기반 Loki push URL과 host/project 라벨을 promtail.yml에 주입합니다.
     command:
       - -config.file=/etc/promtail/promtail.yml

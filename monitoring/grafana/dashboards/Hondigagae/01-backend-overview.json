@@ -1,0 +1,114 @@
+{
+  "id": null,
+  "uid": "hondigagae-backend-overview",
+  "title": "Hondigagae 백엔드 개요",
+  "description": "MSA 서비스 상태와 RED 지표(요청량, 오류율, 응답시간), JVM 힙 사용률을 한 화면에서 확인합니다. 상단 KPI로 현재 환경의 건강 상태를 요약하고, 서비스 카드에서 상세 대시보드로 드릴다운합니다.",
+  "tags": ["hondigagae", "backend", "prometheus", "msa", "red"],
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 3,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "links": [
+    {"asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["hondigagae"], "title": "Hondigagae 대시보드", "type": "dashboards", "targetBlank": false, "tooltip": ""}
+  ],
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "templating": {
+    "list": [
+      {"name": "project", "label": "Project", "type": "constant", "query": "hondigagae", "hide": 2, "current": {"text": "hondigagae", "value": "hondigagae"}},
+      {"name": "service_group", "label": "서비스 그룹", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\"}, service_group)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "env", "label": "환경", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\"}, env)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": false, "multi": false, "sort": 1, "current": {"selected": true, "text": "dev", "value": "dev"}},
+      {"name": "host", "label": "호스트", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\"}, host)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "service", "label": "서비스", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\"}, service)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "instance", "label": "인스턴스", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\"}, instance)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}}
+    ]
+  },
+  "panels": [
+    {"id": 100, "type": "row", "title": "요약", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "panels": []},
+    {
+      "id": 10, "type": "text", "title": "", "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
+      "options": {"mode": "markdown", "content": "### 현재 환경\n\n# `$env`\n\n서비스 그룹: **$service_group**"},
+      "transparent": true
+    },
+    {
+      "id": 11, "type": "stat", "title": "정상 서비스 (UP)", "description": "Prometheus scrape가 성공한 대상 수 / 전체 대상 수입니다.", "gridPos": {"h": 4, "w": 5, "x": 4, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "editorMode": "code", "expr": "sum(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\"})", "legendFormat": "정상"},
+        {"refId": "B", "editorMode": "code", "expr": "count(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\"})", "legendFormat": "전체"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 12, "type": "stat", "title": "전체 요청 처리량", "description": "Actuator를 제외한 초당 총 요청 수입니다.", "gridPos": {"h": 4, "w": 5, "x": 9, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(rate(http_server_requests_seconds_count{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval]))"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 13, "type": "stat", "title": "5xx 오류율", "description": "전체 요청 중 서버 오류(SERVER_ERROR) 비율입니다.", "gridPos": {"h": 4, "w": 5, "x": 14, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(rate(http_server_requests_seconds_count{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\", outcome=\"SERVER_ERROR\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_requests_seconds_count{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval])), 0.000001)"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.01}, {"color": "red", "value": 0.05}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 14, "type": "stat", "title": "최대 힙 사용률", "description": "선택 범위에서 가장 높은 서비스의 힙 사용률입니다.", "gridPos": {"h": 4, "w": 5, "x": 19, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "max(sum by (service) (jvm_memory_used_bytes{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", area=\"heap\"}) / sum by (service) (jvm_memory_max_bytes{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", area=\"heap\"}))"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.7}, {"color": "red", "value": 0.85}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {"id": 101, "type": "row", "title": "서비스 상태", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}, "panels": []},
+    {
+      "id": 1, "type": "stat", "title": "서비스 상태 (UP / DOWN)",
+      "description": "Prometheus scrape 성공 여부입니다. 카드를 클릭하면 해당 서비스의 상세 대시보드로 이동합니다.",
+      "gridPos": {"h": 5, "w": 24, "x": 0, "y": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "min by (service_group, service) (up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\"})", "legendFormat": "{{service_group}} / {{service}}"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}, "links": [{"title": "HTTP 성능 상세: ${__field.labels.service}", "url": "/d/hondigagae-http-performance/hondigagae-http?${__url_time_range}&var-env=${env}&var-service=${__field.labels.service}"}, {"title": "JVM 상세: ${__field.labels.service}", "url": "/d/hondigagae-jvm/hondigagae-jvm?${__url_time_range}&var-env=${env}&var-service=${__field.labels.service}"}]}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {"id": 102, "type": "row", "title": "RED 지표", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 11}, "panels": []},
+    {
+      "id": 2, "type": "timeseries", "title": "HTTP 요청 처리량",
+      "description": "Actuator 요청을 제외한 서비스별 초당 요청 수입니다.",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service) (rate(http_server_requests_seconds_count{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval]))", "legendFormat": "{{service}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 12, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0, "stacking": {"mode": "none", "group": "A"}}, "links": [{"title": "HTTP 성능 상세: ${__field.labels.service}", "url": "/d/hondigagae-http-performance/hondigagae-http?${__url_time_range}&var-env=${env}&var-service=${__field.labels.service}"}]}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "HTTP p95 응답시간",
+      "description": "집계 가능한 Micrometer 히스토그램으로 계산한 서비스별 p95입니다.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "histogram_quantile(0.95, sum by (le, service) (rate(http_server_requests_seconds_bucket{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval])))", "legendFormat": "{{service}} p95"}],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "JVM 힙 사용률",
+      "description": "서비스별 최대 힙 대비 현재 사용량입니다.",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service) (jvm_memory_used_bytes{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", area=\"heap\"}) / sum by (service) (jvm_memory_max_bytes{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", area=\"heap\"})", "legendFormat": "{{service}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity", "showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.7}, {"color": "red", "value": 0.85}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "HTTP 5xx 오류 비율",
+      "description": "전체 HTTP 요청 중 서버 오류 응답이 차지하는 비율입니다.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service) (rate(http_server_requests_seconds_count{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\", outcome=\"SERVER_ERROR\"}[$__rate_interval])) / clamp_min(sum by (service) (rate(http_server_requests_seconds_count{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", instance=~\"$instance\", uri!~\"/actuator.*\"}[$__rate_interval])), 0.000001)", "legendFormat": "{{service}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 15, "gradientMode": "opacity", "showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.01}, {"color": "red", "value": 0.05}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    }
+  ]
+}

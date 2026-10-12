@@ -1,0 +1,74 @@
+{
+  "id": null,
+  "uid": "hondigagae-jpa-repository",
+  "title": "Hondigagae JPA 리포지토리 성능",
+  "description": "Spring Data 리포지토리 호출 메트릭을 조회합니다. 리포지토리 메서드가 한 번 이상 호출된 이후부터 데이터가 표시됩니다.",
+  "tags": ["hondigagae", "backend", "jpa", "prometheus"],
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 3,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {"from": "now-3h", "to": "now"},
+  "links": [
+    {"asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["hondigagae"], "title": "Hondigagae 대시보드", "type": "dashboards", "targetBlank": false, "tooltip": ""}
+  ],
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "templating": {
+    "list": [
+      {"name": "project", "label": "Project", "type": "constant", "query": "hondigagae", "hide": 2, "current": {"text": "hondigagae", "value": "hondigagae"}},
+      {"name": "env", "label": "환경", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(spring_data_repository_invocations_seconds_count{project=\"$project\"}, env)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": false, "multi": false, "sort": 1, "current": {"selected": true, "text": "dev", "value": "dev"}},
+      {"name": "service", "label": "서비스", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(spring_data_repository_invocations_seconds_count{project=\"$project\", env=\"$env\"}, service)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "repository", "label": "리포지토리", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(spring_data_repository_invocations_seconds_count{project=\"$project\", env=\"$env\", service=~\"$service\"}, repository)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "method", "label": "메서드", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(spring_data_repository_invocations_seconds_count{project=\"$project\", env=\"$env\", service=~\"$service\", repository=~\"$repository\"}, method)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}}
+    ]
+  },
+  "panels": [
+    {"id": 100, "type": "row", "title": "요약 ($env)", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "panels": []},
+    {
+      "id": 10, "type": "stat", "title": "전체 호출률", "description": "선택 조건의 리포지토리 메서드 초당 총 호출 수입니다.", "gridPos": {"h": 5, "w": 8, "x": 0, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(rate(spring_data_repository_invocations_seconds_count{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\"}[$__rate_interval]))"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 11, "type": "stat", "title": "평균 응답시간", "description": "누적 실행시간 증가량 / 호출 증가량으로 계산한 평균입니다.", "gridPos": {"h": 5, "w": 8, "x": 8, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(rate(spring_data_repository_invocations_seconds_sum{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\"}[$__rate_interval])) / clamp_min(sum(rate(spring_data_repository_invocations_seconds_count{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\"}[$__rate_interval])), 0.001)"}],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.1}, {"color": "red", "value": 0.5}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 12, "type": "stat", "title": "오류 호출률", "description": "state=ERROR로 기록된 리포지토리 호출의 초당 발생 수입니다.", "gridPos": {"h": 5, "w": 8, "x": 16, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(rate(spring_data_repository_invocations_seconds_count{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\", state=\"ERROR\"}[$__rate_interval]))"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.001}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {"id": 101, "type": "row", "title": "호출률 / 응답시간", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}, "panels": []},
+    {
+      "id": 1, "type": "timeseries", "title": "리포지토리 호출률", "description": "Spring Data 리포지토리 메서드별 초당 호출 수입니다.", "gridPos": {"h": 9, "w": 12, "x": 0, "y": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service, repository, method) (rate(spring_data_repository_invocations_seconds_count{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\"}[$__rate_interval]))", "legendFormat": "{{service}} / {{repository}}.{{method}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 12, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "리포지토리 평균 응답시간", "description": "리포지토리 메서드의 누적 실행시간 증가량을 호출 증가량으로 나눈 평균입니다.", "gridPos": {"h": 9, "w": 12, "x": 12, "y": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service, repository, method) (rate(spring_data_repository_invocations_seconds_sum{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\"}[$__rate_interval])) / clamp_min(sum by (service, repository, method) (rate(spring_data_repository_invocations_seconds_count{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\"}[$__rate_interval])), 0.001)", "legendFormat": "{{service}} / {{repository}}.{{method}}"}],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 8, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {"id": 102, "type": "row", "title": "오류", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16}, "panels": []},
+    {
+      "id": 3, "type": "timeseries", "title": "리포지토리 오류 발생률", "description": "state=ERROR로 기록된 리포지토리 호출의 초당 발생 수입니다.", "gridPos": {"h": 9, "w": 24, "x": 0, "y": 17},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service, repository, method, exception) (rate(spring_data_repository_invocations_seconds_count{project=\"$project\", env=~\"$env\", service=~\"$service\", repository=~\"$repository\", method=~\"$method\", state=\"ERROR\"}[$__rate_interval]))", "legendFormat": "{{service}} / {{repository}}.{{method}} / {{exception}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "bars", "lineWidth": 1, "fillOpacity": 70, "gradientMode": "none", "showPoints": "never", "stacking": {"mode": "normal", "group": "A"}, "axisSoftMin": 0}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    }
+  ]
+}

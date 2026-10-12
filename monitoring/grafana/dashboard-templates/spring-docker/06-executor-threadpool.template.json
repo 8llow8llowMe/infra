@@ -1,0 +1,98 @@
+{
+  "id": null,
+  "uid": "__PROJECT__-executor-threadpool",
+  "title": "__PROJECT_TITLE__ Executor / Thread Pool",
+  "description": "Micrometer executor 메트릭으로 @Async / ThreadPoolTaskExecutor 스레드 풀의 활성 스레드, 큐 적재량, 풀 크기(core/current/max), 태스크 처리량을 서비스와 executor 이름별로 확인합니다. name 태그는 Spring 빈 이름이며 컨벤션은 {도메인}{용도}TaskExecutor 입니다(백엔드 api-design-guide.md §7). applicationTaskExecutor / taskScheduler 는 Spring 기본 풀이며, 애플리케이션 워커 풀은 별도 TaskExecutor 빈으로 분리합니다.",
+  "tags": ["__PROJECT__", "backend", "prometheus", "executor", "threadpool"],
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {"from": "now-3h", "to": "now"},
+  "links": [
+    {"asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["__PROJECT__"], "title": "__PROJECT_TITLE__ 대시보드", "type": "dashboards", "targetBlank": false, "tooltip": ""}
+  ],
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "templating": {
+    "list": [
+      {"name": "project", "label": "Project", "type": "constant", "query": "__PROJECT__", "hide": 2, "current": {"text": "__PROJECT__", "value": "__PROJECT__"}},
+      {"name": "env", "label": "환경", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(executor_pool_size_threads{project=\"$project\"}, env)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": false, "multi": false, "sort": 1, "current": {"selected": true, "text": "dev", "value": "dev"}},
+      {"name": "service", "label": "서비스", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(executor_pool_size_threads{project=\"$project\", env=\"$env\"}, service)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "executor", "label": "Executor", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(executor_pool_size_threads{project=\"$project\", env=\"$env\", service=~\"$service\"}, name)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}}
+    ]
+  },
+  "panels": [
+    {"id": 100, "type": "row", "title": "Executor 개요 ($env)", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "panels": []},
+    {
+      "id": 1, "type": "stat", "title": "현재 Active 스레드", "description": "선택한 executor들의 현재 실행 중 스레드 합계입니다.", "gridPos": {"h": 5, "w": 8, "x": 0, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(executor_active_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"})"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 2, "type": "stat", "title": "Queue 적재량", "description": "실행 대기 중인 태스크 수 합계입니다. 지속적으로 증가하면 풀이 부족한 신호입니다.", "gridPos": {"h": 5, "w": 8, "x": 8, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum(executor_queued_tasks{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"})"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 50}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Pool 사용률 (평균)", "description": "active / 현재 pool_size의 평균입니다. 100%에 근접하면 스레드 포화입니다.", "gridPos": {"h": 5, "w": 8, "x": 16, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "avg(executor_active_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"} / clamp_min(executor_pool_size_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}, 1))"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {"id": 101, "type": "row", "title": "Pool 사용률", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}, "panels": []},
+    {
+      "id": 4, "type": "timeseries", "title": "Executor별 Pool 사용률 (active / pool_size)", "description": "executor별 활성 스레드 대비 현재 풀 크기 비율입니다.", "gridPos": {"h": 9, "w": 24, "x": 0, "y": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "executor_active_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"} / clamp_min(executor_pool_size_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}, 1)", "legendFormat": "{{service}} / {{name}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 12, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {"id": 102, "type": "row", "title": "Pool 크기 / 스레드", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16}, "panels": []},
+    {
+      "id": 5, "type": "timeseries", "title": "Pool 크기 변화 (core / current / max)", "description": "executor별 core, 현재(pool_size), 최대 스레드 수입니다. current가 max에 붙으면 확장 여력이 없습니다.", "gridPos": {"h": 9, "w": 12, "x": 0, "y": 17},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "editorMode": "code", "expr": "executor_pool_core_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}", "legendFormat": "core / {{service}} / {{name}}"},
+        {"refId": "B", "editorMode": "code", "expr": "executor_pool_size_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}", "legendFormat": "current / {{service}} / {{name}}"},
+        {"refId": "C", "editorMode": "code", "expr": "executor_pool_max_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}", "legendFormat": "max / {{service}} / {{name}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "stepAfter", "lineWidth": 2, "fillOpacity": 8, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": [{"matcher": {"id": "byRegexp", "options": "^max /.*"}, "properties": [{"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [8, 6]}}, {"id": "custom.fillOpacity", "value": 0}]}, {"matcher": {"id": "byRegexp", "options": "^core /.*"}, "properties": [{"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [2, 4]}}, {"id": "custom.fillOpacity", "value": 0}]}]},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Active vs Queue", "description": "executor별 활성 스레드와 대기 큐 적재량입니다.", "gridPos": {"h": 9, "w": 12, "x": 12, "y": 17},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "editorMode": "code", "expr": "executor_active_threads{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}", "legendFormat": "active / {{service}} / {{name}}"},
+        {"refId": "B", "editorMode": "code", "expr": "executor_queued_tasks{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}", "legendFormat": "queued / {{service}} / {{name}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 12, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": [{"matcher": {"id": "byRegexp", "options": "^queued /.*"}, "properties": [{"id": "custom.fillOpacity", "value": 25}]}]},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {"id": 103, "type": "row", "title": "태스크 처리", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 26}, "panels": []},
+    {
+      "id": 7, "type": "timeseries", "title": "완료 태스크 처리율", "description": "executor별 초당 완료 태스크 수입니다.", "gridPos": {"h": 9, "w": 12, "x": 0, "y": 27},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "sum by (service, name) (rate(executor_completed_tasks_total{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}[$__rate_interval]))", "legendFormat": "{{service}} / {{name}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 12, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "태스크 실행시간 (평균 / 최대)", "description": "executor 태스크 실행 소요시간입니다. 평균은 실행시간 합/건수, 최대는 executor_seconds_max입니다.", "gridPos": {"h": 9, "w": 12, "x": 12, "y": 27},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "editorMode": "code", "expr": "sum by (service, name) (rate(executor_seconds_sum{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}[$__rate_interval])) / clamp_min(sum by (service, name) (rate(executor_seconds_count{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"}[$__rate_interval])), 0.001)", "legendFormat": "평균 / {{service}} / {{name}}"},
+        {"refId": "B", "editorMode": "code", "expr": "max by (service, name) (executor_seconds_max{project=\"$project\", env=\"$env\", service=~\"$service\", name=~\"$executor\"})", "legendFormat": "최대 / {{service}} / {{name}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 8, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": [{"matcher": {"id": "byRegexp", "options": "^최대 /.*"}, "properties": [{"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [8, 6]}}]}]},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    }
+  ]
+}
