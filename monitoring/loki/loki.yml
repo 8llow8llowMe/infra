@@ -36,6 +36,14 @@ limits_config:
   retention_period: ${LOKI_RETENTION_PERIOD}
   ingestion_rate_mb: 4
   ingestion_burst_size_mb: 8
+  # deploy(.14)는 메모리 1.9Gi 호스트입니다. 메모리가 튀는 건 수집이 아니라 Grafana 에서
+  # 넓은 시간 범위 LogQL 을 돌릴 때이므로, 한 쿼리가 동시에 여는 하위 쿼리 수를 줄입니다.
+  max_query_parallelism: 4
+  tsdb_max_query_parallelism: 8
+  max_query_series: 1000
+
+querier:
+  max_concurrent: 2
 
 compactor:
   working_directory: /loki/compactor

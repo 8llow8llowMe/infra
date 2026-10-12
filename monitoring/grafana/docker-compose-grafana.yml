@@ -3,6 +3,8 @@ services:
     image: ${GRAFANA_IMAGE}
     container_name: ${GRAFANA_CONTAINER_NAME}
     restart: unless-stopped
+    # 2GB 호스트에서 한 컨테이너가 폭주해도 나머지가 살아남도록 상한을 둡니다. 값은 .env 로 조정합니다.
+    mem_limit: ${GRAFANA_MEM_LIMIT:-320m}
     depends_on:
       - prometheus
     environment:

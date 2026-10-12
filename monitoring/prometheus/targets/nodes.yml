@@ -13,10 +13,12 @@
     project: infra
   targets:
     - 192.168.0.10:9100
+# backend-1: 2026-10-01 prod → dev 서버 2 로 바뀌었다. 지금은 redis-node2 + sentinel2 만 있고
+# 특정 프로젝트 전용이 아니라 project 는 infra 로 둔다. node_exporter 기동 전까지 DOWN 이다.
 - labels:
     host: backend-1
-    role: backend
-    project: bosspickseoul
+    role: dev
+    project: infra
   targets:
     - 192.168.0.13:9100
 # main-server(hostname raspberrypi): MySQL/Redis master + bosspickseoul dev 백엔드.
