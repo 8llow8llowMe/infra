@@ -1,0 +1,30 @@
+# storage(.12) 에서 nginx 프로젝트별 JSON access 로그를 Loki 로 보내는 Promtail (#35).
+# 실행: monitoring/promtail 에서
+#   cp .env.agent.example .env.agent  # PROMTAIL_HOSTNAME=storage
+#   docker compose --env-file .env.agent -f docker-compose-nginx-agent.yml up -d
+services:
+  promtail:
+    image: ${PROMTAIL_IMAGE}
+    container_name: ${PROMTAIL_CONTAINER_NAME}
+    restart: unless-stopped
+    # storage 는 메모리 cgroup 이 꺼져 있어 mem_limit 이 무시됩니다(docker info: No memory limit support).
+    # 메모리 cgroup 을 켜면 바로 적용되도록 상한은 두고, 지금은 Go 런타임 소프트 상한으로 묶습니다.
+    mem_limit: ${PROMTAIL_MEM_LIMIT:-128m}
+    command:
+      - -config.file=/etc/promtail/promtail.yml
+      - -config.expand-env=true
+    environment:
+      LOKI_PUSH_URL: ${LOKI_PUSH_URL}
+      PROMTAIL_HOSTNAME: ${PROMTAIL_HOSTNAME}
+      GOMEMLIMIT: ${PROMTAIL_GOMEMLIMIT:-64MiB}
+      TZ: ${TZ}
+    volumes:
+      - ./promtail-nginx.yml:/etc/promtail/promtail.yml:ro
+      - ./promtail-data:/tmp
+      # nginx 컨테이너가 쓰는 호스트 로그 디렉터리 (nginx/docker-compose-nginx.yml 의 ./logs)
+      - ../../nginx/logs:/var/log/nginx:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
