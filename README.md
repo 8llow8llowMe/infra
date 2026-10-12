@@ -23,7 +23,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `deploy` (모니터링) | `192.168.0.14` | aarch64 | **1.9Gi** | 1.3Gi | 6.0Gi | 모니터링 전용 (2026-10-12 실측, 디스크 235G 중 203G 여유) |
 | `backend-server` | `192.168.0.9` | x86_64 | 15Gi | 13Gi | 4.0Gi | **prod 애플리케이션 전용** (2026-10-10 세팅) |
 
-> `ollama-01`의 총 `30Gi`는 2026-08-14 측정값입니다. RAM 32GB(decimal)는 약 29.8GiB이므로 이 수치만으로 BIOS UMA가 2GB인지 8GB인지 판단할 수 없습니다. 현재 `MemTotal`과 `mem_info_vram_total`을 다시 측정합니다. API 모델은 `gpt-oss:20b`이며, 자원 예산과 UMA 비교 절차는 [ollama-01 안정화 가이드](ollama/HOST-STABILITY.md)를 따릅니다.
+> `ollama-01`의 총 `30Gi`는 2026-08-14 측정값입니다. RAM 32GB(decimal)는 약 29.8GiB이므로 이 수치만으로 BIOS UMA가 2GB인지 8GB인지 판단할 수 없습니다. 현재 `MemTotal`과 `mem_info_vram_total`을 다시 측정합니다. **2026-10-12 node_exporter drm collector 실측: `mem_info_vram_total` 512MiB(= BIOS UMA 512MB), GTT 15.3GiB.** 모델은 VRAM 이 아니라 GTT(시스템 메모리)에 올라갑니다. API 모델은 `gpt-oss:20b`이며, 자원 예산과 UMA 비교 절차는 [ollama-01 안정화 가이드](ollama/HOST-STABILITY.md)를 따릅니다.
 
 > **아키텍처**: `ollama-01` 과 `backend-server` 는 x86_64 이고 나머지 라즈베리파이 계열은 aarch64 입니다. Jenkins 빌더가 `ollama-01` 에 있으므로 **aarch64 호스트(`.11` · `.12` · `.13`)에는 네이티브 바이너리가 포함되는 산출물을 그대로 배포하면 안 됩니다.** JAR 은 무관하지만 Node/Python 산출물은 영향을 받습니다. prod 백엔드가 가는 `backend-server` 는 빌더와 같은 x86_64 라 이 문제가 없습니다.
 
