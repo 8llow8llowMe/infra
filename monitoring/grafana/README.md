@@ -66,6 +66,7 @@ docker restart grafana            # 이 파일 없이도 정상 기동하는지 
 | --- | --- | --- |
 | `01-hosts.json` | Prometheus (`job="node"`) | 호스트 UP, CPU · 메모리 · 루트 디스크 · swap 사용률, available, load/코어, 디스크 I/O, 네트워크 |
 | `02-ollama.json` | Loki + Prometheus | 추론 요청 수 · p50/p95 지연 · 5xx · 호출 호스트별 · 상태 코드, GPU 사용률 · GTT/VRAM, ollama-01 CPU/메모리, 원본 로그 |
+| `03-security.json` | Loki (`job="fail2ban"`, `job="nginx"`) | 차단 · 차단 IP · 탐지 · 예외 수, jail 별 추이, 도메인별 스캐너 444, 탐지 상위 IP · 스캐너 경로, 차단/해제 로그 (#37) |
 
 - **Ollama 는 `/metrics` 가 없습니다(404).** 그래서 요청 지표는 GIN 요청 로그 `[GIN] ... | 200 | 41.5s | 192.168.0.11 | POST "/api/chat"` 를 LogQL `regexp` 로 파싱하고 `unwrap duration(latency)` 로 지연을 구합니다. 로그 형식이 바뀌면 이 대시보드가 비게 됩니다.
 - `/api/ps` · `/api/tags` · `/metrics` 같은 상태 조회는 요청 지표에서 뺍니다. **LogQL 라벨 필터 정규식은 전체 일치가 아니므로** `^(...)$` 앵커를 직접 답니다. 앵커가 없으면 `|/` 갈래가 모든 경로와 맞아 패널이 비었습니다(2026-10-12).

@@ -303,9 +303,22 @@ docker exec nginx nginx -s reload
 
 - 필드: `time`(ISO8601) · `server_name` · `scheme` · `remote_addr` · `xff` · `cf_ip` · `method` · `path`(`$uri`) · `protocol` · `status` · `bytes` · `request_time` · `upstream_addr` · `upstream_status` · `upstream_response_time` · `referer` · `ua`
 - **쿼리스트링은 남기지 않습니다.** 혼디가개 API 는 `lat`/`lng` 같은 사용자 위치를 쿼리로 받으므로 중앙 로그(Loki)로 퍼지지 않게 합니다. 공용 `access.log` 는 fail2ban 때문에 지금처럼 `$request` 전체를 남깁니다.
-- **fail2ban 은 `access.log` · `error.log` 만 읽습니다.** 그래서 프로젝트별 파일은 포맷을 바꿔도 필터에 영향이 없고, 반대로 `main` 포맷은 바꾸지 않습니다.
+- **fail2ban 은 `access.log` 만 읽습니다**(#37 부터 `error.log` 는 읽지 않음). 그래서 프로젝트별 파일은 포맷을 바꿔도 필터에 영향이 없고, 반대로 `main` 포맷은 바꾸지 않습니다.
 - storage 의 promtail(`monitoring/promtail/docker-compose-nginx-agent.yml`)이 `*_access.json.log` 를 읽어 Loki 로 보냅니다. 파일명에서 `project` · `site` · `env` 라벨을 뽑으므로 **새 프로젝트 도메인도 이 이름 규칙만 지키면 자동으로 수집됩니다.**
 - logrotate 가 매일 돌리고 7일 보관합니다. #35 이전의 `*_access.log`(main) 파일은 더 쓰이지 않으며 같은 규칙으로 정리됩니다.
+
+### 스캐너 경로 444 (#37)
+
+`nginx.conf` 의 `map $uri $scanner_probe` 가 우리 서비스에 없는 경로를 판별하고, **모든 server 블록**의 `server_name` 바로 아래 한 줄이 응답 없이 연결을 끊습니다.
+
+```nginx
+if ($scanner_probe) { return 444; }  # 스캐너 경로는 응답 없이 끊는다 (#37, nginx.conf map)
+```
+
+- 대상: 루트 dotfile(`/.env` · `/.git/config` · `/.aws/credentials`, `/.well-known/` 은 제외), 어디든 `/.env` · `/.git` 같은 비밀 dotfile, `*.php` · `*.asp(x)` · `*.jsp` · `*.cgi` · `*.pl`, `wp-*` · `xmlrpc` · `phpmyadmin` · `cgi-bin` 등
+- 2026-09-28~10-12 `access.log` 26만 줄에 대 보니 5.6만 줄(21%)이 여기에 걸렸고, 2xx/3xx 로 정상 응답한 서비스 경로는 없었습니다. `ai.8llow8llowme.com` 은 `/.env` 에도 SPA 화면을 200 으로 주고 있었습니다.
+- **새 server 블록을 만들면 이 한 줄도 넣습니다.** 빠지면 그 도메인은 스캐너 요청을 백엔드까지 넘기고, fail2ban 도 444 가 없어 세지 못합니다.
+- 444 는 이 규칙만 씁니다. fail2ban `nginx-scanner` jail 이 상태 코드 444 로 판정하므로 다른 용도로 444 를 쓰지 않습니다. 차단 규칙은 [`fail2ban/README.md`](../fail2ban/README.md).
 
 ### 컨테이너 로그
 
