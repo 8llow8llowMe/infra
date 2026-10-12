@@ -50,6 +50,7 @@ docker restart grafana            # 이 파일 없이도 정상 기동하는지 
 | `04-http-performance.json` | HTTP RED | 처리량, 4xx율, 5xx율, p95 | URI 처리량, p50/p95/p99, 상태 코드 분포 |
 | `05-jvm.json` | JVM / 런타임 | 가동시간, 힙, CPU, 스레드 | 힙·Non-Heap 메모리, 시스템/프로세스 CPU, load average, 스레드 상태, GC, HikariCP |
 | `06-executor-threadpool.json` | Executor / 스레드 풀 | Active 스레드, Queue 적재량, Pool 사용률 | Pool 사용률(active/pool_size), Pool 크기(core/current/max), Active vs Queue, 완료 처리율, 실행시간 |
+| `07-nginx.json` (Loki) | Nginx 접근 로그 | 요청 수, 5xx·4xx 비율, p95 응답시간, p95 upstream | 도메인별 요청량, 상태 코드 클래스, p50/p95/p99, 느린·많은·5xx·4xx 경로 Top 15, 클라이언트 IP · UA Top 15, 원본 로그 |
 
 프로젝트는 숨겨진 상수로 고정하고, 운영자가 자주 바꾸는 변수는 `서비스 그룹 → 환경 → 호스트/서비스 → 인스턴스 또는 컨테이너` 순서로 배치합니다. `All` 값은 정규식 `.*`로 확장합니다.
 

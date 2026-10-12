@@ -25,7 +25,7 @@ Prometheus 메트릭과 Loki 로그는 project, service_group, env, host, servic
 
 ## 프로젝트 대시보드 만들기
 
-템플릿은 `NN-<이름>.template.json` 6종(개요 · 로그 · JPA · HTTP · JVM · Executor)입니다. BossPickSeoul 대시보드에서 `bosspickseoul` → `__PROJECT__`, `BossPickSeoul` → `__PROJECT_TITLE__` 만 바꿔 만든 것이라, 쿼리는 모두 라벨로만 동작하고 호스트·IP 를 하드코딩하지 않습니다.
+템플릿은 `NN-<이름>.template.json` 7종(개요 · 로그 · JPA · HTTP · JVM · Executor · Nginx)입니다. `07-nginx` 는 #35 에서 새로 만들었고, 나머지 6종은 BossPickSeoul 대시보드에서 `bosspickseoul` → `__PROJECT__`, `BossPickSeoul` → `__PROJECT_TITLE__` 만 바꿔 만든 것이라, 쿼리는 모두 라벨로만 동작하고 호스트·IP 를 하드코딩하지 않습니다.
 
 ```bash
 cd monitoring/grafana

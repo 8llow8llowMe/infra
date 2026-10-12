@@ -290,6 +290,23 @@ docker exec nginx nginx -s reload
 - logrotate 관리
 - Filebeat 수집
 
+### 프로젝트별 JSON 접근 로그 (#35)
+
+프로젝트 도메인은 공용 `access.log`(`main`) 와 별도로 **`<project>_<site>[_dev]_access.json.log`** 를 `loki_json` 포맷으로 남깁니다. `site` 는 `api` 또는 `web`, `_dev` 가 없으면 prod 입니다.
+
+| 파일 | 도메인 |
+| --- | --- |
+| `hondigagae_api_access.json.log` / `hondigagae_api_dev_access.json.log` | `api.` / `api-dev.hondigagae.com` |
+| `hondigagae_web_access.json.log` / `hondigagae_web_dev_access.json.log` | `www.` / `dev.hondigagae.com` |
+| `bosspickseoul_api_dev_access.json.log` | `api-dev.bosspickseoul.com` (#35 전 이름 `bosspickseoul_dev_access.log`) |
+| `bosspickseoul_web_access.json.log` / `bosspickseoul_web_dev_access.json.log` | `bosspickseoul.com` / `dev.bosspickseoul.com` |
+
+- 필드: `time`(ISO8601) · `server_name` · `scheme` · `remote_addr` · `xff` · `cf_ip` · `method` · `path`(`$uri`) · `protocol` · `status` · `bytes` · `request_time` · `upstream_addr` · `upstream_status` · `upstream_response_time` · `referer` · `ua`
+- **쿼리스트링은 남기지 않습니다.** 혼디가개 API 는 `lat`/`lng` 같은 사용자 위치를 쿼리로 받으므로 중앙 로그(Loki)로 퍼지지 않게 합니다. 공용 `access.log` 는 fail2ban 때문에 지금처럼 `$request` 전체를 남깁니다.
+- **fail2ban 은 `access.log` · `error.log` 만 읽습니다.** 그래서 프로젝트별 파일은 포맷을 바꿔도 필터에 영향이 없고, 반대로 `main` 포맷은 바꾸지 않습니다.
+- storage 의 promtail(`monitoring/promtail/docker-compose-nginx-agent.yml`)이 `*_access.json.log` 를 읽어 Loki 로 보냅니다. 파일명에서 `project` · `site` · `env` 라벨을 뽑으므로 **새 프로젝트 도메인도 이 이름 규칙만 지키면 자동으로 수집됩니다.**
+- logrotate 가 매일 돌리고 7일 보관합니다. #35 이전의 `*_access.log`(main) 파일은 더 쓰이지 않으며 같은 규칙으로 정리됩니다.
+
 ### 컨테이너 로그
 
 `entrypoint.sh` 에서 `access.log` 를 stdout 으로 전달하므로 `docker logs nginx` 로도 일부 접근 로그를 확인할 수 있습니다.

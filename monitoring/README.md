@@ -350,7 +350,7 @@ prod는 backend-1(`192.168.0.13`)의 `9xxx` 포트를 사용합니다. 실행하
 | ollama-01 `.10` | O | O (`ollama-01`) | |
 | main-server `.11` | O | O (`main-server`) | available 2.0Gi 로 가장 빠듯하다 |
 | backend-server `.9` | O | O (`backend-server`) | |
-| storage `.12` | O | X | 1.9Gi / swap 2.0Gi(2026-10-12 활성화). nginx 로그 수집을 붙일 때 다시 판단한다 |
+| storage `.12` | O | △ (`storage`, nginx 파일만) | Docker 로그 자동 탐색 없이 `*_access.json.log` 만 읽는다(#35, `docker-compose-nginx-agent.yml`). 메모리 cgroup 이 꺼져 있어 `GOMEMLIMIT=64MiB` 로 묶는다. 기동 직후 RSS 70MB |
 | backend-1 `.13` | O | O (`backend-1`) | 2026-10-12 기동 |
 
 **`storage`(`.12`) · `backend-1`(`.13`) 는 메모리 cgroup 이 꺼져 있습니다** (2026-10-12 확인). Ubuntu raspi 펌웨어가 커널 cmdline 에 `cgroup_disable=memory` 를 붙이고 `/boot/firmware/cmdline.txt` 에 되돌리는 옵션이 없어서, 이 두 호스트에서는 compose `mem_limit` · `deploy.resources.limits.memory` 가 **조용히 무시됩니다**(`docker info` 에 `WARNING: No memory limit support`, `HostConfig.Memory=0`, `docker stats` 가 `0B / 0B`). `.11` · `.14` 는 정상입니다.
