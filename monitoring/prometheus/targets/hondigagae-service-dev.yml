@@ -1,0 +1,56 @@
+# 혼디가개 service dev. dev 는 main-server(.11) 7xxx — 포트 정본은 애플리케이션 레포 backend/docs/deploy-guide.md
+
+- targets:
+    - 192.168.0.11:7081
+  labels:
+    project: hondigagae
+    service_group: service
+    env: dev
+    host: main-server
+    service: auth-service
+    container: hondigagae-auth-service-dev
+    deployment: hondigagae-auth-service-dev
+
+- targets:
+    - 192.168.0.11:7082
+  labels:
+    project: hondigagae
+    service_group: service
+    env: dev
+    host: main-server
+    service: tour-service
+    container: hondigagae-tour-service-dev
+    deployment: hondigagae-tour-service-dev
+
+- targets:
+    - 192.168.0.11:7083
+  labels:
+    project: hondigagae
+    service_group: service
+    env: dev
+    host: main-server
+    service: plan-service
+    container: hondigagae-plan-service-dev
+    deployment: hondigagae-plan-service-dev
+
+- targets:
+    - 192.168.0.11:7085
+  labels:
+    project: hondigagae
+    service_group: service
+    env: dev
+    host: main-server
+    service: ai-service
+    container: hondigagae-ai-service-dev
+    deployment: hondigagae-ai-service-dev
+
+- targets:
+    - 192.168.0.11:7080
+  labels:
+    project: hondigagae
+    service_group: service
+    env: dev
+    host: main-server
+    service: batch-service
+    container: hondigagae-batch-service-dev
+    deployment: hondigagae-batch-service-dev

@@ -3,6 +3,8 @@ services:
     image: ${NODE_EXPORTER_IMAGE}
     container_name: ${NODE_EXPORTER_CONTAINER_NAME}
     restart: unless-stopped
+    # 앱 서버의 메모리를 에이전트가 잠식하지 않도록 상한을 둡니다.
+    mem_limit: ${NODE_EXPORTER_MEM_LIMIT:-64m}
     # 컨테이너 내부에서 호스트의 proc/sys/rootfs를 읽어 host metric을 노출합니다.
     command:
       - --path.procfs=/host/proc

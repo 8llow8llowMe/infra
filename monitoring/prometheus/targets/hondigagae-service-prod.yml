@@ -1,0 +1,56 @@
+# 혼디가개 service prod. prod 는 backend-server(.9) 5xxx — 포트 정본은 애플리케이션 레포 backend/docs/deploy-guide.md
+
+- targets:
+    - 192.168.0.9:5081
+  labels:
+    project: hondigagae
+    service_group: service
+    env: prod
+    host: backend-server
+    service: auth-service
+    container: hondigagae-auth-service-prod
+    deployment: hondigagae-auth-service-prod
+
+- targets:
+    - 192.168.0.9:5082
+  labels:
+    project: hondigagae
+    service_group: service
+    env: prod
+    host: backend-server
+    service: tour-service
+    container: hondigagae-tour-service-prod
+    deployment: hondigagae-tour-service-prod
+
+- targets:
+    - 192.168.0.9:5083
+  labels:
+    project: hondigagae
+    service_group: service
+    env: prod
+    host: backend-server
+    service: plan-service
+    container: hondigagae-plan-service-prod
+    deployment: hondigagae-plan-service-prod
+
+- targets:
+    - 192.168.0.9:5085
+  labels:
+    project: hondigagae
+    service_group: service
+    env: prod
+    host: backend-server
+    service: ai-service
+    container: hondigagae-ai-service-prod
+    deployment: hondigagae-ai-service-prod
+
+- targets:
+    - 192.168.0.9:5080
+  labels:
+    project: hondigagae
+    service_group: service
+    env: prod
+    host: backend-server
+    service: batch-service
+    container: hondigagae-batch-service-prod
+    deployment: hondigagae-batch-service-prod

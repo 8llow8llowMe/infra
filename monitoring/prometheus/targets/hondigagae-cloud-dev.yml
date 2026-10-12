@@ -1,0 +1,23 @@
+# 혼디가개 cloud dev. dev 는 main-server(.11) 7xxx — 포트 정본은 애플리케이션 레포 backend/docs/deploy-guide.md
+
+- targets:
+    - 192.168.0.11:7761
+  labels:
+    project: hondigagae
+    service_group: cloud
+    env: dev
+    host: main-server
+    service: service-discovery
+    container: hondigagae-service-discovery-dev
+    deployment: hondigagae-service-discovery-dev
+
+- targets:
+    - 192.168.0.11:7000
+  labels:
+    project: hondigagae
+    service_group: cloud
+    env: dev
+    host: main-server
+    service: api-gateway
+    container: hondigagae-api-gateway-dev
+    deployment: hondigagae-api-gateway-dev

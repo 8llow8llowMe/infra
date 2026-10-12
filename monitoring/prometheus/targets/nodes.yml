@@ -21,11 +21,19 @@
     project: infra
   targets:
     - 192.168.0.13:9100
-# main-server(hostname raspberrypi): MySQL/Redis master + bosspickseoul dev 백엔드.
+# main-server(hostname raspberrypi): MySQL/Redis master + bosspickseoul · hondigagae dev 백엔드.
+# 여러 프로젝트가 같이 쓰는 호스트라 project 는 infra 로 둔다.
 # node_exporter를 이 서버에 설치한 뒤부터 수집된다 (monitoring/node-exporter 참고).
 - labels:
     host: main-server
-    role: backend
-    project: bosspickseoul
+    role: dev
+    project: infra
   targets:
     - 192.168.0.11:9100
+# backend-server(x86_64 미니PC): 각 프로젝트 prod 백엔드 + 혼디가개 prod 프론트 (2026-10-10 세팅).
+- labels:
+    host: backend-server
+    role: prod
+    project: infra
+  targets:
+    - 192.168.0.9:9100

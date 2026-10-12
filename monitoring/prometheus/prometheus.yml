@@ -28,6 +28,18 @@ scrape_configs:
       - files:
           - /etc/prometheus/targets/bosspickseoul-service-*.yml
 
+  - job_name: hondigagae-cloud
+    metrics_path: /actuator/prometheus
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/hondigagae-cloud-*.yml
+
+  - job_name: hondigagae-service
+    metrics_path: /actuator/prometheus
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/hondigagae-service-*.yml
+
   - job_name: kafka
     file_sd_configs:
       - files:

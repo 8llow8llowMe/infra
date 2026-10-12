@@ -1,0 +1,78 @@
+{
+  "id": null,
+  "uid": "__PROJECT__-backend-logs",
+  "title": "__PROJECT_TITLE__ 백엔드 로그",
+  "description": "서비스 실행 상태는 Prometheus로, 실제 로그 유입과 내용은 Loki로 확인합니다. 실행 중인 서비스에 최근 로그가 없으면 로그 패널에는 표시되지 않을 수 있습니다.",
+  "tags": ["__PROJECT__", "backend", "loki", "msa"],
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 3,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "10s",
+  "time": {"from": "now-6h", "to": "now"},
+  "links": [
+    {"asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["__PROJECT__"], "title": "__PROJECT_TITLE__ 대시보드", "type": "dashboards", "targetBlank": false, "tooltip": ""}
+  ],
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "templating": {
+    "list": [
+      {"name": "project", "label": "프로젝트", "type": "constant", "query": "__PROJECT__", "hide": 2, "current": {"text": "__PROJECT__", "value": "__PROJECT__"}},
+      {"name": "service_group", "label": "서비스 그룹", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\"}, service_group)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "env", "label": "환경", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\"}, env)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": false, "multi": false, "sort": 1, "current": {"selected": true, "text": "dev", "value": "dev"}},
+      {"name": "host", "label": "호스트", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\"}, host)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "service", "label": "서비스", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\"}, service)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "container", "label": "컨테이너", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"}, "query": {"query": "label_values(up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\"}, container)", "refId": "VariableQuery"}, "refresh": 1, "includeAll": true, "multi": true, "allValue": ".*", "sort": 1, "current": {"selected": true, "text": "All", "value": "$__all"}},
+      {"name": "search", "label": "본문 검색", "type": "textbox", "query": "", "current": {"text": "", "value": ""}}
+    ]
+  },
+  "panels": [
+    {"id": 100, "type": "row", "title": "서비스 상태 / 로그 유입 요약 ($env)", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "panels": []},
+    {
+      "id": 1, "type": "stat", "title": "모니터링 대상 서비스 상태", "description": "Prometheus가 각 Spring Boot Actuator 엔드포인트를 정상적으로 수집하는지 보여줍니다. 로그 발생 여부와는 무관합니다.", "gridPos": {"h": 5, "w": 16, "x": 0, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "editorMode": "code", "expr": "min by (service_group, service) (up{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"})", "legendFormat": "{{service_group}} / {{service}}"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "전체 로그 유입률", "description": "선택 범위에 Loki로 들어온 초당 로그 라인 수입니다.", "gridPos": {"h": 5, "w": 4, "x": 16, "y": 1},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "sum(rate({project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"}[$__auto]))"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 6, "type": "stat", "title": "오류 로그 유입률", "description": "본문에서 error를 대소문자 구분 없이 탐색한 초당 로그 수입니다.", "gridPos": {"h": 5, "w": 4, "x": 20, "y": 1},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "sum(rate({project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"} |~ \"(?i)error\" [$__auto]))"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.01}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {"id": 101, "type": "row", "title": "로그 유입률", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}, "panels": []},
+    {
+      "id": 2, "type": "timeseries", "title": "서비스별 로그 유입률", "description": "선택한 시간 범위에 실제로 Loki에 들어온 로그만 표시합니다. 값이 없어도 위 서비스 상태가 UP이면 애플리케이션이 조용한 상태일 수 있습니다.", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "sum by (service) (rate({project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"}[$__auto]))", "legendFormat": "{{service}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 12, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "경고 / 오류 로그 유입률", "description": "구조화 로그의 level 필드가 아직 통일되지 않아 본문에서 WARN과 ERROR를 대소문자 구분 없이 탐색합니다.", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {"refId": "A", "expr": "sum by (service) (rate({project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"} |~ \"(?i)error\" [$__auto]))", "legendFormat": "{{service}} ERROR"},
+        {"refId": "B", "expr": "sum by (service) (rate({project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"} |~ \"(?i)warn\" [$__auto]))", "legendFormat": "{{service}} WARN"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 15, "gradientMode": "opacity", "showPoints": "never", "axisSoftMin": 0}}, "overrides": [{"matcher": {"id": "byRegexp", "options": ".* ERROR"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}, {"matcher": {"id": "byRegexp", "options": ".* WARN"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}]},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {"id": 102, "type": "row", "title": "실시간 로그", "collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 15}, "panels": []},
+    {
+      "id": 4, "type": "logs", "title": "서비스 실시간 로그", "description": "선택한 서비스와 컨테이너에서 발생한 로그를 최신순으로 표시합니다. 상단 '본문 검색' 변수로 필터링합니다.", "gridPos": {"h": 15, "w": 24, "x": 0, "y": 16},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "{project=\"$project\", service_group=~\"$service_group\", env=\"$env\", host=~\"$host\", service=~\"$service\", container=~\"$container\"} |~ \"(?i)$search\""}],
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true}
+    }
+  ]
+}

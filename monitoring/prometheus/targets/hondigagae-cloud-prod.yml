@@ -1,0 +1,23 @@
+# 혼디가개 cloud prod. prod 는 backend-server(.9) 5xxx — 포트 정본은 애플리케이션 레포 backend/docs/deploy-guide.md
+
+- targets:
+    - 192.168.0.9:5761
+  labels:
+    project: hondigagae
+    service_group: cloud
+    env: prod
+    host: backend-server
+    service: service-discovery
+    container: hondigagae-service-discovery-prod
+    deployment: hondigagae-service-discovery-prod
+
+- targets:
+    - 192.168.0.9:5000
+  labels:
+    project: hondigagae
+    service_group: cloud
+    env: prod
+    host: backend-server
+    service: api-gateway
+    container: hondigagae-api-gateway-prod
+    deployment: hondigagae-api-gateway-prod
