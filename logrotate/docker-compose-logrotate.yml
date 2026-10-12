@@ -8,6 +8,7 @@ services:
     volumes:
       # Nginx 로그 파일 공유 (로테이션 대상)
       - ../nginx/logs:/var/log/nginx
+      - ../fail2ban/logs:/var/log/fail2ban # fail2ban.log (#37)
       # nginx 컨테이너 제어 (reopen 명령)
       - /var/run/docker.sock:/var/run/docker.sock
     environment:

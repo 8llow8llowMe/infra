@@ -6,12 +6,20 @@ services:
       context: .
       dockerfile: fail2ban.Dockerfile
     restart: always
+    # 호스트 iptables(DOCKER-USER 체인)에 규칙을 걸어야 해서 호스트 네트워크를 씁니다 (#37).
+    # 브리지 네트워크에서는 규칙이 컨테이너 자신의 네트워크 네임스페이스에만 들어가 아무것도 막지 못했습니다.
+    network_mode: host
     cap_add:
-      - NET_ADMIN # iptables 제어 권한 (Fail2Ban 필수)
+      - NET_ADMIN # iptables 제어
+      - NET_RAW
     volumes:
       - ../nginx/logs:/var/log/nginx:ro # Nginx 로그 읽기 전용 공유
+      - ./logs:/var/log/fail2ban # fail2ban.log — promtail(Loki) · recidive · logrotate 가 읽습니다
+      - ./fail2ban-data:/var/lib/fail2ban # 차단 이력 DB (bantime.increment · 재기동 복원)
     environment:
       - TZ=Asia/Seoul
+      # log: 기록만(차단 안 함) / enforce: 실제 차단. 새 규칙은 log 로 하루 본 뒤 enforce 로 바꿉니다.
+      - F2B_MODE=${F2B_MODE:-log}
     logging:
       driver: json-file
       options:
@@ -23,10 +31,3 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    networks:
-      - 8llow8llowme-net
-
-networks:
-  8llow8llowme-net:
-    name: 8llow8llowme-net
-    driver: bridge
