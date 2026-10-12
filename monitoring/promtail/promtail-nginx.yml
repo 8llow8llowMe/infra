@@ -1,7 +1,7 @@
-# storage(.12) 전용 Promtail 설정 — nginx 프로젝트별 JSON access 로그만 Loki 로 보냅니다 (#35).
+# storage(.12) 전용 Promtail 설정 — nginx 프로젝트별 JSON access 로그(#35)와 fail2ban 서버 로그(#37)를 Loki 로 보냅니다.
 #
 # storage 는 1.9Gi 단일 인그레스이고 메모리 cgroup 이 꺼져 있어 mem_limit 이 먹지 않습니다.
-# 그래서 Docker 로그 자동 탐색(docker_sd)은 하지 않고 nginx 파일 하나의 글롭만 읽습니다.
+# 그래서 Docker 로그 자동 탐색(docker_sd)은 하지 않고 정해진 파일 글롭만 읽습니다.
 #
 # 파일명 규칙: <project>_<site>[_dev]_access.json.log  (site = api | web, _dev 가 없으면 prod)
 #   hondigagae_api_access.json.log      -> project=hondigagae site=api env=prod
@@ -45,5 +45,29 @@ scrape_configs:
           site:
           env:
           server_name:
+      - labeldrop:
+          - filename
+
+  # fail2ban 서버 로그 (#37). Infra/03-security 대시보드가 읽습니다.
+  # 예: 2026-10-12 13:35:15,352 fail2ban.actions        [1]: NOTICE  [nginx-scanner] Ban 203.0.113.7
+  # jail 과 동작(Found · Ban · Unban · Restore Ban · Ignore)만 라벨로 올리고 IP 는 본문에 둡니다.
+  - job_name: fail2ban
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fail2ban
+          host: ${PROMTAIL_HOSTNAME}
+          __path__: /var/log/fail2ban/fail2ban.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) fail2ban\.\S+\s+\[\d+\]:\s+(?P<level>[A-Z]+)\s+\[(?P<jail>[^\]]+)\]\s+(?P<action>Found|Restore Ban|Ban|Unban|Ignore)\s'
+      - timestamp:
+          source: time
+          format: '2006-01-02 15:04:05,000'
+          location: Asia/Seoul
+      - labels:
+          jail:
+          action:
       - labeldrop:
           - filename
