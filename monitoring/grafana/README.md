@@ -57,6 +57,19 @@ docker restart grafana            # 이 파일 없이도 정상 기동하는지 
 
 `06-executor-threadpool.json`의 `Executor` 변수와 범례는 Micrometer `executor_*` 메트릭의 `name` 태그를 사용하며, 이 값은 **Spring `ThreadPoolTaskExecutor` 빈 이름**입니다. 백엔드는 `{도메인}{용도}TaskExecutor` 규약(`backend/docs/api-design-guide.md` §7)을 따르므로 빈 이름만으로 서비스·용도가 드러납니다. `applicationTaskExecutor`, `taskScheduler`는 Spring 기본 풀이며, 애플리케이션 워커는 전용 빈으로 분리합니다. 빈 이름을 바꾸면 이 대시보드의 범례도 함께 바뀝니다.
 
+## Infra 대시보드 (#31)
+
+`dashboards/Infra` 는 프로젝트가 아니라 호스트·공용 인프라를 봅니다. 상단 드롭다운은 `infra` 태그로 묶입니다.
+
+| 파일 | 데이터소스 | 핵심 패널 |
+| --- | --- | --- |
+| `01-hosts.json` | Prometheus (`job="node"`) | 호스트 UP, CPU · 메모리 · 루트 디스크 · swap 사용률, available, load/코어, 디스크 I/O, 네트워크 |
+| `02-ollama.json` | Loki + Prometheus | 추론 요청 수 · p50/p95 지연 · 5xx · 호출 호스트별 · 상태 코드, GPU 사용률 · GTT/VRAM, ollama-01 CPU/메모리, 원본 로그 |
+
+- **Ollama 는 `/metrics` 가 없습니다(404).** 그래서 요청 지표는 GIN 요청 로그 `[GIN] ... | 200 | 41.5s | 192.168.0.11 | POST "/api/chat"` 를 LogQL `regexp` 로 파싱하고 `unwrap duration(latency)` 로 지연을 구합니다. 로그 형식이 바뀌면 이 대시보드가 비게 됩니다.
+- `/api/ps` · `/api/tags` · `/metrics` 같은 상태 조회는 요청 지표에서 뺍니다. **LogQL 라벨 필터 정규식은 전체 일치가 아니므로** `^(...)$` 앵커를 직접 답니다. 앵커가 없으면 `|/` 갈래가 모든 경로와 맞아 패널이 비었습니다(2026-10-12).
+- GPU 는 node_exporter `--collector.drm`(amdgpu)입니다. 2026-10-12 실측: VRAM 512MiB, GTT 15.3GiB 중 11.8GiB 사용(`gpt-oss:20b` 로드 상태).
+
 ## 공개 대시보드 적용 기준
 
 현재 JSON은 공개 대시보드를 그대로 복사하지 않고 다음 대시보드의 운영 관점을 BossPickSeoul 라벨 계약에 맞게 적용했습니다.
