@@ -20,7 +20,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `main-server` (hostname `raspberrypi`) | `192.168.0.11` | aarch64 / Cortex-A76 | 7.8Gi | 4.7Gi | **31Gi** | dev 애플리케이션 · dev DB |
 | `storage` | `192.168.0.12` | aarch64 / Cortex-A76 | **1.9Gi** | 1.1Gi | **0** | 인그레스 · 오브젝트 스토리지 |
 | `backend-1` | `192.168.0.13` | aarch64 | 7.7Gi | **6.4Gi** | 2.0Gi | **dev 애플리케이션 2** (2026-10-01 prod → dev 변경) |
-| `deploy` (모니터링) | `192.168.0.14` | 미실측 | 미실측 | 미실측 | 미실측 | Grafana · Prometheus |
+| `deploy` (모니터링) | `192.168.0.14` | aarch64 | **1.9Gi** | 1.3Gi | 6.0Gi | 모니터링 전용 (2026-10-12 실측, 디스크 235G 중 203G 여유) |
 | `backend-server` | `192.168.0.9` | x86_64 | 15Gi | 13Gi | 4.0Gi | **prod 애플리케이션 전용** (2026-10-10 세팅) |
 
 > `ollama-01`의 총 `30Gi`는 2026-08-14 측정값입니다. RAM 32GB(decimal)는 약 29.8GiB이므로 이 수치만으로 BIOS UMA가 2GB인지 8GB인지 판단할 수 없습니다. 현재 `MemTotal`과 `mem_info_vram_total`을 다시 측정합니다. API 모델은 `gpt-oss:20b`이며, 자원 예산과 UMA 비교 절차는 [ollama-01 안정화 가이드](ollama/HOST-STABILITY.md)를 따릅니다.
@@ -37,7 +37,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.11` main-server | BossPickSeoul **dev 백엔드**, mysql, redis-node1 + sentinel1, backend-dev-agent |
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
 | `192.168.0.13` backend-1 | sneezecast **dev 백엔드**(예정), backend-dev2-agent(예정), redis-node2 + sentinel2 |
-| `192.168.0.14` deploy | grafana, prometheus, node-exporter |
+| `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측) |
 | `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10) |
 
 **혼디가개 prod DB 는 `backend-server` 가 아니라 `.11` main-server 의 mysql 에 있습니다** (스키마 `hondigagae_{auth,tour,plan}_prod`, 2026-10-10 생성). 아래 4절 2번 "dev 와 prod 는 호스트를 공유하지 않는다" 의 예외로, 애플리케이션은 분리하고 DB 인스턴스만 dev 와 함께 씁니다. 그래서 `.11` mysql 의 재시작 · 디스크 · 백업이 prod 에도 영향을 줍니다.

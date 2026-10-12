@@ -10,6 +10,27 @@
 - 대시보드는 **classic 스키마(schemaVersion 40)** + 접이식 row 패널 구조입니다. 파일 프로비저닝으로 안정적으로 로드됩니다. 탭/auto-grid 같은 v2 동적 대시보드는 experimental이며 `kubernetesDashboards,dashboardNewLayouts` 피처 토글이 필요합니다(`grafana/docker-compose-grafana.yml`에 주석으로 준비되어 있습니다).
 - datasource는 이름이 아니라 **고정 uid로 참조**합니다. 프로비저닝된 uid는 `prometheus`, `loki`입니다(`grafana/provisioning/datasources`). 이 uid는 바꾸지 않습니다. 바꾸면 모든 대시보드가 깨집니다.
 
+### 기존 Grafana 를 고정 uid datasource 로 올릴 때 (2026-10-12, deploy 11.3.0 → 12.4.0)
+
+uid 없이 프로비저닝됐던 옛 `Prometheus`/`Loki` datasource 가 DB 에 남아 있으면 Grafana 가 `Datasource provisioning error: data source not found` 로 기동에 실패하고 재시작을 반복합니다. 한 번만 옛 항목을 지우고 다시 만듭니다.
+
+```bash
+cd ~/infra/monitoring
+cat > grafana/provisioning/datasources/00-migrate-delete-legacy.yml <<'YML'
+apiVersion: 1
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: Loki
+    orgId: 1
+YML
+docker restart grafana            # 로그에 inserting datasource ... uid=prometheus / uid=loki 확인
+rm grafana/provisioning/datasources/00-migrate-delete-legacy.yml
+docker restart grafana            # 이 파일 없이도 정상 기동하는지 확인
+```
+
+업그레이드 전에는 `docker exec grafana tar czf - -C /var/lib/grafana --exclude=plugins . > grafana-data-backup.tgz` 로 DB 를 백업합니다. `grafana-data` 는 UID 472 소유라 호스트 계정으로는 바로 읽을 수 없습니다.
+
 ## 대시보드 공통 구조
 
 모든 대시보드는 동일한 규칙을 따릅니다.

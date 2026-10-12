@@ -72,6 +72,23 @@ deploy monitoring server     │    │
 
 deploy 서버가 Raspberry Pi 5 2GB라면 `Grafana + Prometheus + node_exporter`를 기본으로 켜고, `Loki + Promtail`은 로그 대시보드가 필요할 때부터 켜는 것을 권장합니다.
 
+### deploy(.14) 자원 기준 (2026-10-12 실측)
+
+메모리 1.9Gi · swap 6.0Gi · 디스크 235G(203G 여유)이고, 5개 컨테이너(grafana · prometheus · loki · promtail · node-exporter)가 모두 떠 있는 상태에서 사용량은 641Mi 입니다. Prometheus head series 는 1,543 개였습니다.
+
+- 컨테이너마다 `mem_limit` 를 겁니다 (합계 1.6Gi, `.env` 의 `*_MEM_LIMIT`). 한 컨테이너가 폭주해도 나머지가 남게 하려는 것입니다.
+- Loki 는 `max_query_parallelism` · `querier.max_concurrent` 를 낮춰 둡니다. 2GB 호스트에서 메모리가 튀는 건 수집보다 넓은 범위 LogQL 쿼리입니다.
+- **available 이 500Mi 아래로 지속되면** 모니터링 스택을 `backend-1`(`.13`, 7.7Gi)로 옮기는 것을 다시 검토합니다. 설정은 모두 이 레포에 있어 옮길 때 바뀌는 것은 `nginx/conf.d/grafana.conf` upstream 과 각 서버 promtail 의 `LOKI_PUSH_URL` 입니다.
+
+### deploy 서버의 `~/infra` 는 git 체크아웃이 아닙니다 (2026-10-12 확인)
+
+다른 호스트와 달리 `git pull` 로 반영할 수 없습니다. 레포의 `monitoring/` 을 `.env` 와 `*-data` 를 제외하고 복사해 반영합니다. 덮어쓰기 전에 현재 디렉터리를 백업합니다.
+
+```bash
+# 작업 PC (레포 루트)에서
+tar czf - --exclude='.env' --exclude='*-data' --exclude='promtail/data' monitoring   | ssh deploy 'cd ~/infra && tar czf ~/monitoring-backup-$(date +%Y%m%d%H%M).tgz --exclude="*-data" monitoring && tar xzf -'
+```
+
 ## 파일/폴더 구조
 
 ```text
@@ -136,6 +153,7 @@ vi .env
 | `PROMETHEUS_RETENTION_TIME` | Prometheus 데이터 보관 기간 |
 | `PROMETHEUS_RETENTION_SIZE` | Prometheus 데이터 최대 크기 |
 | `LOKI_RETENTION_PERIOD` | Loki 로그 보관 기간 |
+| `*_MEM_LIMIT` | 컨테이너 메모리 상한. 비우면 compose 기본값(prometheus 640m, grafana 320m, loki 384m, promtail 192m, node-exporter 64m) |
 | `MONITORING_PROMTAIL_LOKI_PUSH_URL` | monitoring 서버 Promtail이 로그를 보낼 Loki push URL |
 | `MONITORING_PROMTAIL_HOSTNAME` | monitoring 서버 로그에 붙일 host 라벨 |
 | `MONITORING_PROMTAIL_PROJECT` | monitoring 서버 로그에 붙일 project 라벨 |

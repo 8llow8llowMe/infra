@@ -3,6 +3,8 @@ services:
     image: ${NODE_EXPORTER_IMAGE}
     container_name: ${NODE_EXPORTER_CONTAINER_NAME}
     restart: unless-stopped
+    # 2GB 호스트에서 한 컨테이너가 폭주해도 나머지가 살아남도록 상한을 둡니다. 값은 .env 로 조정합니다.
+    mem_limit: ${NODE_EXPORTER_MEM_LIMIT:-64m}
     # 컨테이너 내부에서 호스트의 proc/sys/rootfs를 읽어 host metric을 노출합니다.
     command:
       - --path.procfs=/host/proc
