@@ -1,0 +1,49 @@
+# storage(.12) 전용 Promtail 설정 — nginx 프로젝트별 JSON access 로그만 Loki 로 보냅니다 (#35).
+#
+# storage 는 1.9Gi 단일 인그레스이고 메모리 cgroup 이 꺼져 있어 mem_limit 이 먹지 않습니다.
+# 그래서 Docker 로그 자동 탐색(docker_sd)은 하지 않고 nginx 파일 하나의 글롭만 읽습니다.
+#
+# 파일명 규칙: <project>_<site>[_dev]_access.json.log  (site = api | web, _dev 가 없으면 prod)
+#   hondigagae_api_access.json.log      -> project=hondigagae site=api env=prod
+#   hondigagae_web_dev_access.json.log  -> project=hondigagae site=web env=dev
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: ${LOKI_PUSH_URL}
+
+scrape_configs:
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          host: ${PROMTAIL_HOSTNAME}
+          __path__: /var/log/nginx/*_access.json.log
+    pipeline_stages:
+      - regex:
+          source: filename
+          expression: '/var/log/nginx/(?P<project>[a-z0-9]+)_(?P<site>api|web)(?P<dev>_dev)?_access\.json\.log$'
+      - template:
+          source: env
+          template: '{{ if .dev }}dev{{ else }}prod{{ end }}'
+      - json:
+          expressions:
+            time: time
+            server_name: server_name
+      - timestamp:
+          source: time
+          format: RFC3339
+      # 낮은 카디널리티 값만 라벨로 올립니다. status · path · IP 는 LogQL `| json` 으로 꺼냅니다.
+      - labels:
+          project:
+          site:
+          env:
+          server_name:
+      - labeldrop:
+          - filename
