@@ -342,6 +342,21 @@ prod는 backend-1(`192.168.0.13`)의 `9xxx` 포트를 사용합니다. 실행하
 
 혼디가개 compose 는 컨테이너마다 `observability.project=hondigagae` 등 관측 라벨을 붙이므로, 같은 호스트의 Promtail 하나로 다른 프로젝트 로그와 구분됩니다. 여러 프로젝트가 같이 쓰는 호스트(`.11`, `.9`)의 Promtail `PROMTAIL_PROJECT` 는 `infra` 로 둡니다. 관측 라벨이 없는 mysql · redis · Jenkins agent 로그가 특정 프로젝트로 잘못 묶이지 않게 하려는 것입니다.
 
+## 호스트별 에이전트 현황 (2026-10-12 기동·실측)
+
+| 호스트 | node_exporter | promtail (`PROMTAIL_HOSTNAME`) | 비고 |
+| --- | --- | --- | --- |
+| deploy `.14` | O | O (`deploy`) | monitoring 스택 자체 |
+| ollama-01 `.10` | O | O (`ollama-01`) | |
+| main-server `.11` | O | O (`main-server`) | available 2.0Gi 로 가장 빠듯하다 |
+| backend-server `.9` | O | O (`backend-server`) | |
+| storage `.12` | O | X | 1.9Gi / swap 0. nginx 로그 수집을 붙일 때 다시 판단한다 |
+| backend-1 `.13` | X | X | 아직 미설치 — `node` job 에서 DOWN |
+
+모든 호스트의 `~/infra` 는 git 체크아웃이 아니므로 `monitoring/node-exporter`, `monitoring/promtail` 을 tar 로 복사해 `install-*.sh` 를 실행했습니다. 공유 호스트의 `PROMTAIL_PROJECT` 는 `infra` 입니다.
+
+promtail 을 처음 띄우면 기존 docker 로그 전체를 읽으므로, 일주일(`reject_old_samples_max_age` 기본값)보다 오래된 줄은 Loki 가 `400 ... has timestamp too old` 로 거절합니다. 처음 한 번 밀린 로그를 다 읽고 나면 사라지므로 무시해도 됩니다.
+
 ## Grafana 대시보드 프로비저닝
 
 `grafana/dashboards/BossPickSeoul`의 JSON은 Grafana의 BossPickSeoul 폴더로 자동 프로비저닝됩니다.
