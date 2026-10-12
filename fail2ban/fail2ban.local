@@ -1,0 +1,10 @@
+# Fail2Ban 서버 설정 (#37)
+# loglevel · logtarget · DB 는 jail.local 이 아니라 이 파일([Definition])에서 정합니다.
+[Definition]
+loglevel  = INFO
+# 호스트 ./logs 에 남겨 promtail(storage)이 Loki 로 보내고 recidive jail 이 읽습니다. 회전은 logrotate 컨테이너가 합니다.
+logtarget = /var/log/fail2ban/fail2ban.log
+# 차단 이력을 30일 남겨야 bantime.increment(반복 시 두 배)와 재기동 뒤 차단 복원이 동작합니다.
+# DB 는 호스트 ./fail2ban-data 에 둬서 이미지를 다시 빌드해도 남습니다.
+dbfile     = /var/lib/fail2ban/fail2ban.sqlite3
+dbpurgeage = 30d
