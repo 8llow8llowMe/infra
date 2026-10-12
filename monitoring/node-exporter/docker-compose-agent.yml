@@ -11,6 +11,8 @@ services:
       - --path.sysfs=/host/sys
       - --path.rootfs=/rootfs
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|run/docker/netns)($$|/)
+      # AMD GPU(amdgpu) 사용률·VRAM·GTT. amdgpu 가 없는 호스트에서는 아무것도 내지 않습니다 (#31).
+      - --collector.drm
     ports:
       - '${NODE_EXPORTER_PORT}:9100'
     volumes:
