@@ -350,7 +350,7 @@ prod는 backend-1(`192.168.0.13`)의 `9xxx` 포트를 사용합니다. 실행하
 | ollama-01 `.10` | O | O (`ollama-01`) | |
 | main-server `.11` | O | O (`main-server`) | available 2.0Gi 로 가장 빠듯하다 |
 | backend-server `.9` | O | O (`backend-server`) | |
-| storage `.12` | O | X | 1.9Gi / swap 0. nginx 로그 수집을 붙일 때 다시 판단한다 |
+| storage `.12` | O | X | 1.9Gi / swap 2.0Gi(2026-10-12 활성화). nginx 로그 수집을 붙일 때 다시 판단한다 |
 | backend-1 `.13` | X | X | 아직 미설치 — `node` job 에서 DOWN |
 
 모든 호스트의 `~/infra` 는 git 체크아웃이 아니므로 `monitoring/node-exporter`, `monitoring/promtail` 을 tar 로 복사해 `install-*.sh` 를 실행했습니다. 공유 호스트의 `PROMTAIL_PROJECT` 는 `infra` 입니다.
