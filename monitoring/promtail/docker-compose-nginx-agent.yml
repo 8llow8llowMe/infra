@@ -23,6 +23,8 @@ services:
       - ./promtail-data:/tmp
       # nginx 컨테이너가 쓰는 호스트 로그 디렉터리 (nginx/docker-compose-nginx.yml 의 ./logs)
       - ../../nginx/logs:/var/log/nginx:ro
+      # fail2ban 서버 로그 (fail2ban/docker-compose-fail2ban.yml 의 ./logs) (#37)
+      - ../../fail2ban/logs:/var/log/fail2ban:ro
     logging:
       driver: json-file
       options:
