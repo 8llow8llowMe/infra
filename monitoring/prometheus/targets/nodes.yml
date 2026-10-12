@@ -37,3 +37,11 @@
     project: infra
   targets:
     - 192.168.0.9:9100
+# storage: nginx · MinIO · redis-node3 인그레스 호스트. 1.9Gi / swap 0 이라 promtail 은 두지 않고
+# node_exporter(mem_limit 64m)만 둔다 (2026-10-12 기동).
+- labels:
+    host: storage
+    role: ingress
+    project: infra
+  targets:
+    - 192.168.0.12:9100
