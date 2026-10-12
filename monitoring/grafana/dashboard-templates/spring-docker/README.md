@@ -25,13 +25,19 @@ Prometheus 메트릭과 Loki 로그는 project, service_group, env, host, servic
 
 ## 프로젝트 대시보드 만들기
 
-1. 템플릿 JSON을 `grafana/dashboards/<ProjectName>`으로 복사합니다.
-2. `__PROJECT__`를 프로젝트 라벨 값으로 바꿉니다.
-3. `__PROJECT_TITLE__`를 표시할 제목으로 바꿉니다.
-4. 모든 대시보드에 전역에서 고유한 uid를 부여합니다.
-5. 데이터소스 uid는 `prometheus` / `loki`로 유지합니다.
-6. `<project>-<group>-<env>.yml` 형식의 Prometheus target 파일을 추가합니다.
-7. Grafana를 재시작하거나 30초 프로비저닝 폴링을 기다립니다.
+템플릿은 `NN-<이름>.template.json` 6종(개요 · 로그 · JPA · HTTP · JVM · Executor)입니다. BossPickSeoul 대시보드에서 `bosspickseoul` → `__PROJECT__`, `BossPickSeoul` → `__PROJECT_TITLE__` 만 바꿔 만든 것이라, 쿼리는 모두 라벨로만 동작하고 호스트·IP 를 하드코딩하지 않습니다.
+
+```bash
+cd monitoring/grafana
+sh render-dashboards.sh hondigagae Hondigagae   # dashboards/Hondigagae/*.json 생성
+```
+
+1. 위 스크립트로 `dashboards/<Folder>/` 를 만듭니다. uid 는 `<project>-...` 라 프로젝트끼리 겹치지 않습니다.
+2. 데이터소스 uid는 `prometheus` / `loki`로 유지합니다.
+3. `<project>-<group>-<env>.yml` 형식의 Prometheus target 파일과 `prometheus.yml` job 을 추가합니다.
+4. Grafana 30초 프로비저닝 폴링을 기다리거나 재시작합니다.
+
+템플릿을 고친 뒤에는 렌더링된 모든 프로젝트 폴더를 다시 만듭니다. `sh render-dashboards.sh bosspickseoul BossPickSeoul` 결과가 커밋된 BossPickSeoul JSON 과 같아야 합니다(2026-10-12 확인).
 
 템플릿은 접이식 row 패널, KPI 요약 row, `env` 전환 변수, 대시보드 드롭다운 링크를 갖춘 classic 스키마(schemaVersion 40)를 사용합니다. 이 구성은 Grafana 12에서 안정적으로 프로비저닝됩니다. 탭 / auto-grid(v2 스키마)는 선택 사항이며 `kubernetesDashboards,dashboardNewLayouts` 피처 토글이 필요합니다.
 
