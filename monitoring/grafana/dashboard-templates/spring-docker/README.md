@@ -19,6 +19,8 @@
 
 Prometheus 메트릭과 Loki 로그는 project, service_group, env, host, service를 공유합니다. Prometheus는 추가로 instance를, Loki는 추가로 container와 deployment를 사용합니다.
 
+Loki 에는 같은 `project` · `env` 라벨을 단 백엔드 밖 로그도 들어옵니다. nginx 접근 로그(`job="nginx"`, #35)는 `service_group` · `service` · `container` 라벨이 없고, frontend 컨테이너 로그는 `service_group="frontend"` 입니다. Loki 는 `label=~".*"` 에 그 라벨이 없는 스트림도 매칭하므로, `02-backend-logs` 의 `service_group` 변수는 `allValue` 를 두지 않습니다. 그러면 All 이 Prometheus 수집 그룹 목록(`(cloud|service)`)으로 펼쳐져 백엔드 로그만 남습니다(#39). 2026-10-13 .14 Loki 실측에서 hondigagae · bosspickseoul 백엔드 로그 스트림의 `service_group` 은 모두 `cloud` · `service` 였습니다.
+
 ## 데이터소스 참조
 
 패널과 템플릿 변수는 `${DS_*}` 변수가 아니라 고정 uid로 데이터소스를 참조합니다. 프로비저닝된 uid는 `prometheus`와 `loki`입니다(`grafana/provisioning/datasources` 참고). 이 uid는 바꾸지 않습니다. 바꾸면 모든 대시보드가 깨집니다.
