@@ -1,0 +1,57 @@
+# PostgreSQL — 여러 프로젝트가 나눠 쓰는 인스턴스 하나(dev: main-server 192.168.0.11).
+#
+# 프로젝트마다 데이터베이스 · 계정을 따로 만든다(scripts/create-project-db.sh). 슈퍼유저는 운영자만 쓴다.
+# 비밀번호는 같은 디렉터리의 `.env` 에만 둔다(공개 레포 — 커밋 금지). 템플릿은 `.env.example`.
+#
+#   기동:  sh install-postgresql.sh
+#   확인:  docker compose --env-file .env -f docker-compose-postgresql.yml ps
+#
+# main-server 는 MySQL · 여러 dev 백엔드가 같이 올라가 메모리가 빠듯하다 — 메모리 상한과 shared_buffers 를 작게 둔다.
+services:
+  postgresql:
+    image: postgres:17-alpine
+    container_name: postgresql
+    restart: always
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?PostgreSQL/.env 에 POSTGRES_SUPERUSER_PASSWORD 를 채우세요}
+      # 앱은 timestamptz(Instant)로 저장한다. 세션 기본 시간대를 UTC 로 둬 psql 로 볼 때 헷갈리지 않게 한다
+      TZ: UTC
+      PGTZ: UTC
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-384MB}
+      - -c
+      - work_mem=4MB
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      - -c
+      - log_min_duration_statement=1000
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    mem_limit: ${POSTGRES_MEM_LIMIT:-768m}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - 8llow8llowme-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgresql-data:
+
+networks:
+  8llow8llowme-net:
+    name: 8llow8llowme-net
+    external: true
