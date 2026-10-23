@@ -23,8 +23,8 @@ main-server (dev 배포 대상)
 └── frontend-dev-agent              # label: deploy-frontend-dev
 
 backend-1 (dev 배포 대상 2 — 2026-10-01 prod 에서 변경)
-└── backend-dev2-agent              # label: deploy-backend-dev2 (미기동)
-                                    # 프론트가 필요해지면 frontend-dev2-agent / deploy-frontend-dev2
+├── backend-dev2-agent              # label: deploy-backend-dev2 (env 준비, 노드 생성 대기)
+└── frontend-dev2-agent             # label: deploy-frontend-dev2 (2026-10-23 신설 — env 준비, 노드 생성 대기)
 
 backend-server (prod 배포 대상 — 192.168.0.9, 2026-10-10 세팅)
 ├── backend-prod-agent              # label: deploy-backend-prod (2026-10-10 기동)
@@ -182,13 +182,16 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | `ai-host-builder` | ollama-01 (`192.168.0.10`) | `builder` `builder-backend` `builder-frontend` | Gradle build/test, Next.js install/build | 기동 중 — **`builder-frontend` 라벨 추가 필요** |
 | `backend-dev-agent` | main-server (`192.168.0.11`) | `deploy-backend-dev` | 백엔드 dev compose 배포 | 기동 중 |
 | `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
-| `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | **미기동 — 컨테이너 추가 필요** |
+| `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | **미기동** — `.13` 에 `.env.backend-dev2` 준비(2026-10-23), Jenkins UI 노드 생성 · secret 기입 대기 |
+| `frontend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-frontend-dev2` | 프론트 dev 2 compose 배포 (2026-10-23 신설, commerce-foundry) | **미기동** — `.13` 에 `.env.frontend-dev2` 준비, Jenkins UI 노드 생성 · secret 기입 대기 |
 | `backend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-backend-prod` | 백엔드 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
 | `frontend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
 
 2026-10-01 에 backend-1 이 prod 에서 dev 서버 2 로 바뀌었습니다(루트 `README.md` §1). prod agent 두 개는 기동된 적이 없어 옮길 컨테이너는 없고, 띄울 위치만 백엔드 prod 전용으로 새로 들인 미니PC 로 바꿨습니다. 라벨은 그대로입니다. 미니PC 는 2026-10-10 에 `backend-server`(`192.168.0.9`)로 세팅했고 `backend-prod-agent` 를 띄웠습니다. `frontend-prod-agent` 도 같은 호스트에 둡니다(혼디가개 프론트 prod, 2026-10-10 결정).
 
-`backend-dev2-agent` 는 역할 · 호스트 기준 이름이라 특정 프로젝트 전용이 아닙니다. 첫 사용자는 sneezecast dev 백엔드이고, 다른 프로젝트의 dev 를 backend-1 에 올릴 때도 이 agent 를 씁니다. 프론트 dev 배포가 backend-1 에 필요해지면 `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`)를 같은 방식으로 추가합니다.
+`backend-dev2-agent` 는 역할 · 호스트 기준 이름이라 특정 프로젝트 전용이 아닙니다. backend-1 에 올리는 dev 백엔드(commerce-foundry · sneezecast)가 함께 쓰고, 프로젝트는 멀티브랜치 잡과 배포 lock 으로 나뉩니다. 프론트 dev 는 commerce-foundry(storefront · admin)가 backend-1 에 올라가 `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`)를 같은 방식으로 더했습니다(2026-10-23).
+
+backend-1 의 `~/infra/jenkins` 는 2026-10-23 에 레포 정본으로 다시 맞췄습니다(이전 사본 `~/infra/jenkins.bak.20261023145133`). 기동 순서: Jenkins UI 에서 노드 `backend-dev2-agent`(라벨 `deploy-backend-dev2`) · `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`) 생성 → 각 secret 을 `.env.backend-dev2` · `.env.frontend-dev2` 의 `JENKINS_DEPLOY_AGENT_SECRET` 에 기입 → `sh install-jenkins-agent.sh .env.backend-dev2` · `sh install-jenkins-agent.sh .env.frontend-dev2`.
 
 노드명은 컨테이너명과 다릅니다. 빌더의 컨테이너명은 `jenkins-builder-agent` 이고 **노드명은 `ai-host-builder`** 입니다(`.env` 의 `JENKINS_BUILDER_NAME`). agent secret 이 노드명으로 발급되므로 이 값을 바꾸면 secret 도 다시 받아야 합니다.
 
