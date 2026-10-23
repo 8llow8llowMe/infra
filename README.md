@@ -14,12 +14,14 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 
 `backend-server` 행은 `2026-10-10` 세팅 직후 실측값입니다 (컨테이너는 `backend-prod-agent` 하나).
 
+`main-server` · `backend-1` 의 available 은 `2026-10-23` 에 다시 쟀습니다(commerce-foundry 배치 검토, 8절). `main-server` 는 그 뒤 PostgreSQL 을 얹었습니다.
+
 | 호스트 | IP | CPU | 총 메모리 | available | swap | 성격 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ollama-01` | `192.168.0.10` | x86_64 / Ryzen 7 8845HS | 30Gi | 13Gi | 8Gi | AI · 빌드 · 시크릿 · 메시징 |
-| `main-server` (hostname `raspberrypi`) | `192.168.0.11` | aarch64 / Cortex-A76 | 7.8Gi | 4.7Gi | **31Gi** | dev 애플리케이션 · dev DB |
+| `main-server` (hostname `raspberrypi`) | `192.168.0.11` | aarch64 / Cortex-A76 | 7.8Gi | **1.9Gi** (2026-10-23, 08-14 엔 4.7Gi) | **31Gi** | dev 애플리케이션 · dev DB(MySQL · PostgreSQL) |
 | `storage` | `192.168.0.12` | aarch64 / Cortex-A76 | **1.9Gi** | 1.1Gi | 2.0Gi (2026-10-12 활성화, 그 전엔 **0**) | 인그레스 · 오브젝트 스토리지 |
-| `backend-1` | `192.168.0.13` | aarch64 | 7.7Gi | **6.4Gi** | 2.0Gi | **dev 애플리케이션 2** (2026-10-01 prod → dev 변경) |
+| `backend-1` | `192.168.0.13` | aarch64 / Ubuntu 25.04 | 7.7Gi | **7.2Gi** (2026-10-23, 디스크 458G 중 422G 여유) | 2.0Gi | **dev 애플리케이션 2** (2026-10-01 prod → dev 변경) |
 | `deploy` (모니터링) | `192.168.0.14` | aarch64 | **1.9Gi** | 1.3Gi | 6.0Gi | 모니터링 전용 (2026-10-12 실측, 디스크 235G 중 203G 여유) |
 | `backend-server` | `192.168.0.9` | x86_64 | 15Gi | 13Gi | 4.0Gi | **prod 애플리케이션 전용** (2026-10-10 세팅) |
 
@@ -34,9 +36,9 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | 호스트 | 올라가 있는 것 |
 | --- | --- |
 | `192.168.0.10` ollama-01 | ollama, open-webui, kafka-1/2/3, kafka-exporter, kafka-ui, vault, jenkins-controller, jenkins-builder-agent, searxng |
-| `192.168.0.11` main-server | BossPickSeoul **dev 백엔드**, mysql, redis-node1 + sentinel1, backend-dev-agent |
+| `192.168.0.11` main-server | BossPickSeoul **dev 백엔드**, 혼디가개 **dev 백엔드 · 프론트**, mysql, **postgresql**(2026-10-23, commerce-foundry dev DB), redis-node1 + sentinel1, backend-dev-agent, frontend-dev-agent |
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
-| `192.168.0.13` backend-1 | sneezecast **dev 백엔드**(예정), backend-dev2-agent(예정), redis-node2 + sentinel2 |
+| `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정), sneezecast **dev 백엔드**(예정), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
 | `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측) |
 | `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10) |
 
@@ -150,6 +152,7 @@ nginx 가 `.12` 에 있어 외부 진입은 어차피 1홉이지만, 게이트�
    | 혼디가개 | `7xxx` | `5xxx` |
    | TripMarble | — | `8xxx` |
    | sneezecast | `3xxx` | `4xxx` |
+   | commerce-foundry | `2xxx` | `1xxx` |
    | 인프라 도구 | `1xxxx~5xxxx` (5자리) | 〃 |
 
    프로젝트가 늘 때 대역을 새로 잡는 이유는 단순합니다. dev 호스트 `.11` · `.13` 과 prod 미니PC 에는
@@ -266,7 +269,47 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 
 ---
 
-## 8. 컴포넌트 문서
+## 8. commerce-foundry 배치 요약
+
+쇼핑몰 엔진(백엔드 Spring Cloud MSA + Next.js storefront · admin, 앱 레포 `commerce-foundry`)입니다. 2026-10-23 결정입니다.
+**PostgreSQL 전용**입니다(스키마 · Testcontainers · 제약 위반 판정이 PostgreSQL 기준) — 공용 MySQL 에 붙이지 않고 같은 dev DB 호스트에 PostgreSQL 을 따로 둡니다.
+
+### dev — backend-1(`.13`) 에 앱 전부, DB 는 main-server(`.11`)
+
+| 대상 | 호스트 | 호스트 포트 | 비고 |
+| --- | --- | --- | --- |
+| service-discovery | `192.168.0.13` | 2761 | |
+| api-gateway | `192.168.0.13` | 2000 | 외부 진입점(nginx → 게이트웨이) |
+| auth / product / order / payment / delivery | `192.168.0.13` | 2081 / 2082 / 2083 / 2084 / 2085 | |
+| operations(작업 · 알림, 추가 예정) | `192.168.0.13` | 2086 | 앱 레포 #212 |
+| 프론트 storefront / admin | `192.168.0.13` | 2300 / 2301 | |
+| PostgreSQL | `192.168.0.11` | 5432 | DB `commerce_foundry`, 계정 `commerce_dev`, 스키마 `auth` · `product` · `orders` · `payment` · `delivery` · `operations` |
+
+- 메모리: 백엔드 JVM 8개 × ~384MB + Next.js 2개 × ~256MB ≈ **3.6Gi(추정)**. sneezecast dev(~1.8Gi) 와 같이 올라가면 `.13` available 7.2Gi 중 ~5.4Gi 를 쓴다 — 컨테이너마다 `mem_limit` 을 건다.
+- 프론트는 aarch64 라 x86_64 빌더 산출물의 네이티브 모듈을 그대로 쓰지 않는다(4절 6번) — 배포 호스트에서 이미지를 빌드한다(앱 레포 #199).
+- deploy agent: `backend-dev2-agent`(라벨 `deploy-backend-dev2`) · `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`, 신설). 역할 이름이라 sneezecast 와 같이 쓰고 프로젝트는 잡 · lock 으로 나뉜다. `.13` 의 `~/infra/jenkins/.env.backend-dev2` · `.env.frontend-dev2` 를 만들어 두었고 **Jenkins UI 노드 생성 → secret 기입 → `sh install-jenkins-agent.sh .env.<이름>`** 만 남았다(jenkins/README.md).
+- 배포 디렉터리: `.13` 의 `~/deploy/commerce-foundry`.
+
+### prod — 앱은 backend-server(`.9`), DB 는 전용 서버 신설
+
+- 앱: `backend-server`(x86_64, 15Gi) 에 백엔드 + 프론트를 같이 둔다. 빌더와 아키텍처가 같아 네이티브 문제가 없다. 포트는 dev 와 끝자리가 같은 `1xxx`(게이트웨이 1000, auth 1081 …, storefront 1300 · admin 1301). 예상 ~3.6Gi.
+- **DB: 운영 전용 서버를 새로 들인다**(x86 미니PC, NVMe). PostgreSQL 운영 인스턴스 + 일일 백업(→ `storage` MinIO). 앱 서버와 장애 · 부하를 나누려는 결정이다(혼디가개처럼 dev DB 호스트를 prod 와 같이 쓰는 예외를 만들지 않는다, 2절). **이 서버가 준비되기 전에는 commerce-foundry 운영을 열지 않는다.**
+
+### 공유 · 분리
+
+| 대상 | 내용 |
+| --- | --- |
+| Jenkins 빌더 · Vault | `.10` 공유 |
+| Redis | 3노드 센티널 공유 — 키 prefix 로 프로젝트를 나눈다 |
+| MinIO | `.12`, 버킷 `commerce-foundry`(dev · prod 접두어) — 앱 레포 #9 이미지 업로드 |
+| Vault 경로(예정) | `kv/commerce-foundry/backend/{dev,prod}/env` · `kv/commerce-foundry/frontend/{dev,prod}/env`, AppRole `jenkins-commerce-foundry`, credential `commerce-foundry-vault-*` |
+| 배포 lock(예정) | `commerce-foundry-backend-deploy` · `commerce-foundry-frontend-deploy` |
+
+**남은 것** — Vault 정책 · bootstrap, Jenkins 노드 2개 생성 · agent 기동, 멀티브랜치 잡, nginx · 도메인 · 인증서, 운영 DB 서버 도입. 앱 레포 이슈 #197(Infra 등록) · #196 · #198 · #199(배포 파일 · 파이프라인).
+
+---
+
+## 9. 컴포넌트 문서
 
 | 디렉터리 | 내용 |
 | --- | --- |
@@ -277,6 +320,7 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | `kafka/` | KRaft 3브로커 + kafka-ui + exporter |
 | `redis/` | 3노드 센티널 |
 | `MySQL/` | dev DB |
+| `PostgreSQL/` | dev DB(PostgreSQL 프로젝트용 — commerce-foundry), 프로젝트 DB · 계정 생성 스크립트 |
 | `MinIO/` | 오브젝트 스토리지 |
 | `monitoring/` | Grafana, Prometheus, node-exporter |
 | `ollama/` | LLM 추론 + open-webui |
