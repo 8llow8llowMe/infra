@@ -38,7 +38,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.10` ollama-01 | ollama, open-webui, kafka-1/2/3, kafka-exporter, kafka-ui, vault, jenkins-controller, jenkins-builder-agent, searxng |
 | `192.168.0.11` main-server | BossPickSeoul **dev 백엔드**, 혼디가개 **dev 백엔드 · 프론트**, mysql, **postgresql**(2026-10-23, commerce-foundry dev DB), redis-node1 + sentinel1, backend-dev-agent, frontend-dev-agent |
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
-| `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정), sneezecast **dev 백엔드**(예정), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
+| `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정, sneezecast 는 2026-10-30 폐기), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
 | `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측) |
 | `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10) |
 
@@ -285,15 +285,35 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | 프론트 storefront / admin | `192.168.0.13` | 2300 / 2301 | |
 | PostgreSQL | `192.168.0.11` | 5432 | DB `commerce_foundry`, 계정 `commerce_dev`, 스키마 `auth` · `product` · `orders` · `payment` · `delivery` · `operations` |
 
-- 메모리: 백엔드 JVM 8개 × ~384MB + Next.js 2개 × ~256MB ≈ **3.6Gi(추정)**. sneezecast dev(~1.8Gi) 와 같이 올라가면 `.13` available 7.2Gi 중 ~5.4Gi 를 쓴다 — 컨테이너마다 `mem_limit` 을 건다.
+- 메모리: 백엔드 JVM 8개 × ~384MB + Next.js 2개 × ~256MB ≈ **3.6Gi(추정)**. sneezecast 가 폐기돼(2026-10-30) `.13` 에는 commerce-foundry 만 올라간다 — available 7.2Gi(2026-10-30 실측) 중 절반이다. 그래도 컨테이너마다 `mem_limit` 을 건다.
 - 프론트는 aarch64 라 x86_64 빌더 산출물의 네이티브 모듈을 그대로 쓰지 않는다(4절 6번) — 배포 호스트에서 이미지를 빌드한다(앱 레포 #199).
-- deploy agent: `backend-dev2-agent`(라벨 `deploy-backend-dev2`) · `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`, 신설). 역할 이름이라 sneezecast 와 같이 쓰고 프로젝트는 잡 · lock 으로 나뉜다. `.13` 의 `~/infra/jenkins/.env.backend-dev2` · `.env.frontend-dev2` 를 만들어 두었고 **Jenkins UI 노드 생성 → secret 기입 → `sh install-jenkins-agent.sh .env.<이름>`** 만 남았다(jenkins/README.md).
+- deploy agent: `backend-dev2-agent`(라벨 `deploy-backend-dev2`) · `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`, 신설). 역할 이름이라 다른 프로젝트가 `.13` 에 오면 같이 쓰고 프로젝트는 잡 · lock 으로 나뉜다. `.13` 의 `~/infra/jenkins/.env.backend-dev2` · `.env.frontend-dev2` 를 만들어 두었고 **Jenkins UI 노드 생성 → secret 기입 → `sh install-jenkins-agent.sh .env.<이름>`** 만 남았다(jenkins/README.md).
 - 배포 디렉터리: `.13` 의 `~/deploy/commerce-foundry`.
 
 ### prod — 앱은 backend-server(`.9`), DB 는 전용 서버 신설
 
 - 앱: `backend-server`(x86_64, 15Gi) 에 백엔드 + 프론트를 같이 둔다. 빌더와 아키텍처가 같아 네이티브 문제가 없다. 포트는 dev 와 끝자리가 같은 `1xxx`(게이트웨이 1000, auth 1081 …, storefront 1300 · admin 1301). 예상 ~3.6Gi.
 - **DB: 운영 전용 서버를 새로 들인다**(x86 미니PC, NVMe). PostgreSQL 운영 인스턴스 + 일일 백업(→ `storage` MinIO). 앱 서버와 장애 · 부하를 나누려는 결정이다(혼디가개처럼 dev DB 호스트를 prod 와 같이 쓰는 예외를 만들지 않는다, 2절). **이 서버가 준비되기 전에는 commerce-foundry 운영을 열지 않는다.**
+  - 2026-10-30 재검토 — 결정 유지. 대안을 다시 봤지만 아래 이유로 뺐다.
+    `.11` 은 dev DB 호스트라 dev 사고가 운영 데이터로 번지고(2절), `.9` 는 앱 JVM 의 OOM 이 DB 를 같이 죽인다.
+    `.10` 은 available 10Gi 지만 ollama 가 모델 로드에 따라 메모리를 탄력적으로 먹는다(2026-10-30 실측 used 19Gi).
+    전용 서버를 바로 들이지 못하면 **임시로 `.10` 에 메모리 예약 · 상한을 건 인스턴스**를 두는 것이 차선이다 — 운영은 이미
+    `.10` 의 Kafka · Vault 에 의존하므로 장애 도메인이 새로 늘지 않는다.
+
+### 도메인 · 인그레스 (2026-10-30)
+
+| 환경 | 스토어프론트(국문 `/ko` · 영문 `/en`) | 어드민 |
+| --- | --- | --- |
+| dev | `dev.mokoyuri.shop` | `admin-dev.mokoyuri.shop` |
+| prod | `mokoyuri.shop` (+ `www`) | `admin.mokoyuri.shop` |
+
+- `mokoyuri.shop` 은 임시 도메인이다. `mokoyuri.com` 은 카페24 쇼핑몰이 쓰는 중이라 운영이 안정된 뒤 이관한다.
+  도메인은 nginx conf 와 Vault 값에만 두고 앱 레포(공개)에는 쓰지 않는다 — 이관 때 바꿀 곳이 이 둘뿐이다.
+- 언어는 경로로 나눠(`/ko` · `/en`) 도메인 하나로 국문 · 영문을 함께 서비스한다. `.co.kr` 을 쓰지 않은 이유다.
+- **nginx 는 `storage`(`.12`) 의 공용 인그레스를 함께 쓴다.** 공인 IP 하나의 80/443 을 받는 곳은 어차피 하나라
+  전용 nginx 를 따로 두면 `.12` 앞단에 홉만 하나 늘고 단일 장애점은 그대로다. 대신 conf · 인증서 · 접근 로그를
+  프로젝트별로 나누고, reload 전 `nginx -t` 를 지킨다. 운영 트래픽이 커져 `.12`(1.9Gi) 가 버거워지면 인그레스 자체를
+  더 큰 호스트로 옮긴다 — 프로젝트별 nginx 분리보다 그쪽이 먼저다.
 
 ### 공유 · 분리
 
@@ -305,7 +325,7 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | Vault 경로(예정) | `kv/commerce-foundry/backend/{dev,prod}/env` · `kv/commerce-foundry/frontend/{dev,prod}/env`, AppRole `jenkins-commerce-foundry`, credential `commerce-foundry-vault-*` |
 | 배포 lock(예정) | `commerce-foundry-backend-deploy` · `commerce-foundry-frontend-deploy` |
 
-**남은 것** — Vault 정책 · bootstrap, Jenkins 노드 2개 생성 · agent 기동, 멀티브랜치 잡, nginx · 도메인 · 인증서, 운영 DB 서버 도입. 앱 레포 이슈 #197(Infra 등록) · #196 · #198 · #199(배포 파일 · 파이프라인).
+**남은 것** — Vault 정책 · bootstrap, Jenkins 노드 2개 생성 · agent 기동, 멀티브랜치 잡, DNS(`dev` · `admin-dev`.mokoyuri.shop) · 인증서, 운영 DB 서버 도입. 앱 레포 이슈 #197(Infra 등록) · #196 · #198 · #199(배포 파일 · 파이프라인).
 
 ---
 
