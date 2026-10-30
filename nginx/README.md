@@ -507,6 +507,35 @@ docker exec nginx nginx -t && docker exec nginx nginx -s reload
 
 ---
 
+## commerce-foundry(MOKOYURI) 도메인 맵
+
+`mokoyuri.shop` 은 임시 도메인이다(2026-10-30 구매). dev · prod 를 모두 여기서 운영하다가 운영이 안정되면
+카페24 가 쓰는 `mokoyuri.com` 으로 이관한다. 이관 때는 conf 의 `server_name` · 인증서 경로만 바꾸도록
+파일명에 TLD 를 넣지 않았다(`dev.mokoyuri.conf`).
+
+| 도메인 | 대상 | 호스트 | 설정 파일 |
+| --- | --- | --- | --- |
+| `https://dev.mokoyuri.shop` | 개발 스토어프론트(국문 `/ko` · 영문 `/en`) | backend-1 `192.168.0.13:2300` | `conf.d/dev.mokoyuri.conf` |
+| `https://admin-dev.mokoyuri.shop` | 개발 어드민 | backend-1 `192.168.0.13:2301` | `conf.d/admin-dev.mokoyuri.conf` |
+
+- 언어는 경로로 나눈다(앱의 경로 방식 i18n). 언어별 도메인을 따로 두지 않는다.
+- API 도메인은 열지 않는다. storefront · admin 이 BFF 로 같은 docker 네트워크의 게이트웨이를 부른다.
+  토스 웹훅(앱 레포 #15)이 생기면 `api-dev` 를 연다.
+- 운영(미작성): `mokoyuri.shop`(+www) · `admin.mokoyuri.shop` → backend-server `1300` · `1301`.
+
+적용 순서는 sneezecast 절과 같다 — DNS 전파 확인 → conf 배치(HTTP 블록만) · reload →
+`./init-cert-non-www.sh dev.mokoyuri.shop` · `./init-cert-non-www.sh admin-dev.mokoyuri.shop` → HTTPS 블록 주석 해제 · reload.
+
+### DNS 체크리스트
+
+- `dev.mokoyuri.shop` · `admin-dev.mokoyuri.shop` A -> 공개 Nginx 호스트
+
+### 개발 access 로그
+
+- `/var/log/nginx/commerce_storefront_dev_access.json.log` · `commerce_admin_dev_access.json.log`
+
+---
+
 ## sneezecast 도메인 맵
 
 | 도메인 | 대상 | 호스트 | 설정 파일 |
