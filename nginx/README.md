@@ -530,6 +530,19 @@ docker exec nginx nginx -t && docker exec nginx nginx -s reload
 
 - `dev.mokoyuri.shop` · `admin-dev.mokoyuri.shop` A -> 공개 Nginx 호스트
 
+### 캐시 · 연결 (2026-11-01)
+
+공용 정의는 `conf.d/00-commerce-foundry.conf` 에 있다(이름은 `cf_` 접두어 — 다른 프로젝트 conf 와 안 겹치게). prod conf 도 같은 것을 쓴다.
+
+| 대상 | 처리 | 이유 |
+| --- | --- | --- |
+| `/_next/static/` | nginx 디스크 캐시 `cf_static`(키 10m · 본문 최대 1g · 7일), `X-Cache-Status` 헤더 | 파일명에 콘텐츠 해시가 붙어 불변 — 반복 요청이 앱 호스트까지 가지 않는다 |
+| `/_next/static/` 의 `Cache-Control` | **add_header 하지 않는다** — Next 의 `public, max-age=31536000, immutable` 그대로 | 덧붙이면 헤더가 두 줄 나간다(혼디가개 #21과 같은 문제, 2026-11-01 수정) |
+| HTML(SSR) | 캐시하지 않는다(Next 가 `no-store`), `proxy_buffering off` | 개인화 · 스트리밍 |
+| upstream | `keepalive 16` + `Connection $cf_connection_upgrade` | 웹소켓일 때만 upgrade, 나머지는 .12 → 앱 호스트 TCP 연결 재사용 |
+
+확인: `curl -sI https://dev.mokoyuri.shop/_next/static/<파일>` 두 번 — `X-Cache-Status: MISS` → `HIT`, `Cache-Control` 한 줄.
+
 ### 개발 access 로그
 
 - `/var/log/nginx/commerce_storefront_dev_access.json.log` · `commerce_admin_dev_access.json.log`
