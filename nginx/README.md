@@ -521,14 +521,24 @@ docker exec nginx nginx -t && docker exec nginx nginx -s reload
 - 언어는 경로로 나눈다(앱의 경로 방식 i18n). 언어별 도메인을 따로 두지 않는다.
 - API 도메인은 열지 않는다. storefront · admin 이 BFF 로 같은 docker 네트워크의 게이트웨이를 부른다.
   토스 웹훅(앱 레포 #15)이 생기면 `api-dev` 를 연다.
-- 운영(미작성): `mokoyuri.shop`(+www) · `admin.mokoyuri.shop` → backend-server `1300` · `1301`.
+- 운영 · API (2026-11-01, #51):
+
+| 도메인 | 대상 | 설정 파일 | 지금 |
+| --- | --- | --- | --- |
+| `https://mokoyuri.shop` (대표, `www` → 301) | 운영 스토어프론트 backend-server `192.168.0.9:1300` | `conf.d/mokoyuri.conf` | 배포 전 — 점검 안내 503 |
+| `https://admin.mokoyuri.shop` | 운영 어드민 `192.168.0.9:1301` | `conf.d/admin.mokoyuri.conf` | 배포 전 — 점검 안내 503 |
+| `https://api.mokoyuri.shop` · `https://api-dev.mokoyuri.shop` | 없음(닫힘) | `conf.d/api.mokoyuri.conf` | 모든 경로 404 |
+
+- 운영 conf 는 앱 호스트에 닿지 못할 때(502 · 504)만 `@cf_maintenance` 점검 안내(503, noindex, Retry-After)를 보여 준다. 운영을 배포하면 별도 작업 없이 실제 응답으로 넘어간다.
+  운영 배포 때 Vault `STOREFRONT_BIND_PROD` · `ADMIN_BIND_PROD` 를 `192.168.0.9` 로 둬야 이 nginx 가 닿는다(기본 루프백).
+- API 도메인은 인증서만 준비했다. 브라우저는 BFF 를 거치므로 게이트웨이를 외부에 열지 않는다. 토스 웹훅(앱 레포 #15) 경로만 그때 연다.
 
 적용 순서는 sneezecast 절과 같다 — DNS 전파 확인 → conf 배치(HTTP 블록만) · reload →
 `./init-cert-non-www.sh dev.mokoyuri.shop` · `./init-cert-non-www.sh admin-dev.mokoyuri.shop` → HTTPS 블록 주석 해제 · reload.
 
 ### DNS 체크리스트
 
-- `dev.mokoyuri.shop` · `admin-dev.mokoyuri.shop` A -> 공개 Nginx 호스트
+- apex · `www` · `admin` · `admin-dev` · `dev` · `api` · `api-dev` A -> 공개 Nginx 호스트 (가비아, 2026-11-01 모두 등록)
 
 ### 캐시 · 연결 (2026-11-01)
 
