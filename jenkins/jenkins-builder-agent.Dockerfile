@@ -1,5 +1,5 @@
 # Jenkins builder agent 이미지입니다.
-# Java 21, Docker CLI/Compose, Git, Node.js 24, yarn, pnpm, Gradle 캐시를 포함합니다.
+# Java 21, Docker CLI/Compose, Git, jq, Node.js 24, yarn, pnpm, Gradle 캐시를 포함합니다.
 
 FROM eclipse-temurin:21-jdk-jammy AS jdk
 
@@ -21,6 +21,7 @@ RUN apt-get update \
     git \
     gnupg \
     gosu \
+    jq \
     lsb-release \
     tini \
     unzip \
