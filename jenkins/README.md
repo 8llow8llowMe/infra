@@ -16,7 +16,7 @@ ollama-01 / Jenkins 서버
 ├── jenkins-controller              # Web UI, pipeline 관리
 └── ai-host-builder                 # label: builder builder-backend builder-frontend
                                     # 컨테이너명은 jenkins-builder-agent
-                                    # (Java 21/Node 22/pnpm 포함 — 프론트 전용 빌더를 따로 두지 않는다)
+                                    # (Java 21/Node 24/pnpm 포함 — 프론트 전용 빌더를 따로 두지 않는다)
 
 main-server (dev 배포 대상)
 ├── backend-dev-agent               # label: deploy-backend-dev
@@ -195,7 +195,7 @@ backend-1 의 `~/infra/jenkins` 는 2026-10-23 에 레포 정본으로 다시 �
 
 노드명은 컨테이너명과 다릅니다. 빌더의 컨테이너명은 `jenkins-builder-agent` 이고 **노드명은 `ai-host-builder`** 입니다(`.env` 의 `JENKINS_BUILDER_NAME`). agent secret 이 노드명으로 발급되므로 이 값을 바꾸면 secret 도 다시 받아야 합니다.
 
-**빌더를 공유하는 이유** — `jenkins-builder-agent.Dockerfile` 에 Java 21, Node.js 22, `pnpm` 이 모두 들어 있고, Gradle/pnpm 캐시가 named volume 으로 붙어 있습니다. 프론트 전용 빌더를 새로 띄우면 compose project 이름이 달라져 **캐시 볼륨이 분리되고 콜드 빌드가 매번 느려집니다.** 라벨만 추가하는 것으로 충분합니다.
+**빌더를 공유하는 이유** — `jenkins-builder-agent.Dockerfile` 에 Java 21, Node.js 24(2026-11-01 22 → 24, #48), `pnpm` 이 모두 들어 있고, Gradle/pnpm 캐시가 named volume 으로 붙어 있습니다. 프론트 전용 빌더를 새로 띄우면 compose project 이름이 달라져 **캐시 볼륨이 분리되고 콜드 빌드가 매번 느려집니다.** 라벨만 추가하는 것으로 충분합니다.
 
 **deploy agent 를 나누는 이유** — 하는 일은 같지만(`tar` 전개 + `docker compose up` + health check) 운영상 분리가 낫습니다.
 
