@@ -38,7 +38,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.10` ollama-01 | ollama, open-webui, kafka-1/2/3, kafka-exporter, kafka-ui, vault, jenkins-controller, jenkins-builder-agent, searxng |
 | `192.168.0.11` main-server | BossPickSeoul **dev 백엔드**, 혼디가개 **dev 백엔드 · 프론트**, mysql, **postgresql**(2026-10-23, commerce-foundry dev DB), redis-node1 + sentinel1, backend-dev-agent, frontend-dev-agent |
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
-| `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정, sneezecast 는 2026-10-30 폐기), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
+| `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정. sneezecast 는 2026-10-30 배포 보류 — 설정은 유지), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
 | `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측) |
 | `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10) |
 
@@ -285,7 +285,7 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | 프론트 storefront / admin | `192.168.0.13` | 2300 / 2301 | |
 | PostgreSQL | `192.168.0.11` | 5432 | DB `commerce_foundry`, 계정 `commerce_dev`, 스키마 `auth` · `product` · `orders` · `payment` · `delivery` · `operations` |
 
-- 메모리: 백엔드 JVM 8개 × ~384MB + Next.js 2개 × ~256MB ≈ **3.6Gi(추정)**. sneezecast 가 폐기돼(2026-10-30) `.13` 에는 commerce-foundry 만 올라간다 — available 7.2Gi(2026-10-30 실측) 중 절반이다. 그래도 컨테이너마다 `mem_limit` 을 건다.
+- 메모리: 백엔드 JVM 8개 × ~384MB + Next.js 2개 × ~256MB ≈ **3.6Gi(추정)**. sneezecast 배포가 보류돼(2026-10-30, 재개 가능 — 설정 유지) 지금 `.13` 에는 commerce-foundry 만 올라간다 — available 7.2Gi(2026-10-30 실측) 중 절반이다. 그래도 컨테이너마다 `mem_limit` 을 건다.
 - 프론트는 aarch64 라 x86_64 빌더 산출물의 네이티브 모듈을 그대로 쓰지 않는다(4절 6번) — 배포 호스트에서 이미지를 빌드한다(앱 레포 #199).
 - deploy agent: `backend-dev2-agent`(라벨 `deploy-backend-dev2`) · `frontend-dev2-agent`(라벨 `deploy-frontend-dev2`, 신설). 역할 이름이라 다른 프로젝트가 `.13` 에 오면 같이 쓰고 프로젝트는 잡 · lock 으로 나뉜다. `.13` 의 `~/infra/jenkins/.env.backend-dev2` · `.env.frontend-dev2` 를 만들어 두었고 **Jenkins UI 노드 생성 → secret 기입 → `sh install-jenkins-agent.sh .env.<이름>`** 만 남았다(jenkins/README.md).
 - 배포 디렉터리: `.13` 의 `~/deploy/commerce-foundry`.
