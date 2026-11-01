@@ -305,7 +305,10 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | 환경 | 스토어프론트(국문 `/ko` · 영문 `/en`) | 어드민 |
 | --- | --- | --- |
 | dev | `dev.mokoyuri.shop` | `admin-dev.mokoyuri.shop` |
-| prod | `mokoyuri.shop` (+ `www`) | `admin.mokoyuri.shop` |
+| prod | `mokoyuri.shop` (대표, `www` → 301) | `admin.mokoyuri.shop` |
+| API | `api.mokoyuri.shop` · `api-dev.mokoyuri.shop` — 인증서만, 경로 닫힘(토스 웹훅 때 그 경로만 연다) | |
+
+- 인증서 · nginx 는 7개 도메인 모두 준비됐다(2026-11-01, #51). 운영은 배포 전까지 점검 안내(503)를 보여 준다.
 
 - `mokoyuri.shop` 은 임시 도메인이다. `mokoyuri.com` 은 카페24 쇼핑몰이 쓰는 중이라 운영이 안정된 뒤 이관한다.
   도메인은 nginx conf 와 Vault 값에만 두고 앱 레포(공개)에는 쓰지 않는다 — 이관 때 바꿀 곳이 이 둘뿐이다.
@@ -325,7 +328,7 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | Vault 경로(예정) | `kv/commerce-foundry/backend/{dev,prod}/env` · `kv/commerce-foundry/frontend/{dev,prod}/env`, AppRole `jenkins-commerce-foundry`, credential `commerce-foundry-vault-*` |
 | 배포 lock(예정) | `commerce-foundry-backend-deploy` · `commerce-foundry-frontend-deploy` |
 
-**남은 것** — Vault 정책 · bootstrap, Jenkins 노드 2개 생성 · agent 기동, 멀티브랜치 잡, DNS(`dev` · `admin-dev`.mokoyuri.shop) · 인증서, 운영 DB 서버 도입. 앱 레포 이슈 #197(Infra 등록) · #196 · #198 · #199(배포 파일 · 파이프라인).
+**남은 것** — Vault 정책 · bootstrap, Jenkins 노드 2개 생성 · agent 기동, 운영 DB 서버 도입 · 운영 배포. (dev 배포 · Jenkins · Vault · 도메인 7개 인증서는 2026-11-01 완료) 앱 레포 이슈 #197(Infra 등록) · #196 · #198 · #199(배포 파일 · 파이프라인).
 
 ---
 
