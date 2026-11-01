@@ -180,6 +180,7 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | Jenkins 노드명 | 실제 서버 | Jenkins 라벨 | 역할 | 상태 |
 | --- | --- | --- | --- | --- |
 | `ai-host-builder` | ollama-01 (`192.168.0.10`) | `builder` `builder-backend` `builder-frontend` | Gradle build/test, Next.js install/build | 기동 중 — **`builder-frontend` 라벨 추가 필요** |
+| `backend-1-builder` | backend-1 (`192.168.0.13`, aarch64) | `builder-frontend-arm64` | commerce-foundry 프론트 **dev 배포 빌드**(배포 호스트와 같은 아키텍처 — sharp 네이티브) | 기동 중 (2026-11-01 Connected, `.env.builder-arm64`, mem 2g · cpus 3) |
 | `backend-dev-agent` | main-server (`192.168.0.11`) | `deploy-backend-dev` | 백엔드 dev compose 배포 | 기동 중 |
 | `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
 | `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | 기동 중 (2026-11-01 `Connected` 확인, commerce-foundry dev) |
