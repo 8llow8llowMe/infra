@@ -23,8 +23,8 @@ main-server (dev 배포 대상)
 └── frontend-dev-agent              # label: deploy-frontend-dev
 
 backend-1 (dev 배포 대상 2 — 2026-10-01 prod 에서 변경)
-├── backend-dev2-agent              # label: deploy-backend-dev2 (env 준비, 노드 생성 대기)
-└── frontend-dev2-agent             # label: deploy-frontend-dev2 (2026-10-23 신설 — env 준비, 노드 생성 대기)
+├── backend-dev2-agent              # label: deploy-backend-dev2 (2026-11-01 기동 · Connected)
+└── frontend-dev2-agent             # label: deploy-frontend-dev2 (2026-10-23 신설, 2026-11-01 기동 · Connected)
 
 backend-server (prod 배포 대상 — 192.168.0.9, 2026-10-10 세팅)
 ├── backend-prod-agent              # label: deploy-backend-prod (2026-10-10 기동)
@@ -182,8 +182,8 @@ docker compose --env-file .env.frontend-dev -f docker-compose-jenkins-deploy-age
 | `ai-host-builder` | ollama-01 (`192.168.0.10`) | `builder` `builder-backend` `builder-frontend` | Gradle build/test, Next.js install/build | 기동 중 — **`builder-frontend` 라벨 추가 필요** |
 | `backend-dev-agent` | main-server (`192.168.0.11`) | `deploy-backend-dev` | 백엔드 dev compose 배포 | 기동 중 |
 | `frontend-dev-agent` | main-server (`192.168.0.11`) | `deploy-frontend-dev` | 프론트 dev compose 배포 | 기동 중 (2026-09-03 `docker ps` 확인) |
-| `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | **미기동** — `.13` 에 `.env.backend-dev2` 준비(2026-10-23), Jenkins UI 노드 생성 · secret 기입 대기 |
-| `frontend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-frontend-dev2` | 프론트 dev 2 compose 배포 (2026-10-23 신설, commerce-foundry) | **미기동** — `.13` 에 `.env.frontend-dev2` 준비, Jenkins UI 노드 생성 · secret 기입 대기 |
+| `backend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-backend-dev2` | 백엔드 dev 2 compose 배포 | 기동 중 (2026-11-01 `Connected` 확인, commerce-foundry dev) |
+| `frontend-dev2-agent` | backend-1 (`192.168.0.13`) | `deploy-frontend-dev2` | 프론트 dev 2 compose 배포 (2026-10-23 신설, commerce-foundry) | 기동 중 (2026-11-01 `Connected` 확인) |
 | `backend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-backend-prod` | 백엔드 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
 | `frontend-prod-agent` | backend-server (`192.168.0.9`) | `deploy-frontend-prod` | 프론트 prod compose 배포 | 기동 중 (2026-10-10 `Connected` 확인) |
 
@@ -341,3 +341,13 @@ docker exec jenkins-builder-agent cat /proc/1/comm   # tini
 ```
 
 deploy agent 도 각 서버에서 같은 방식으로 다시 빌드합니다.
+
+## commerce-foundry 잡 (2026-11-01)
+
+- 폴더 `commerce-foundry` 아래 멀티브랜치 잡 9개 — 백엔드 `commerce-foundry-{service-discovery,api-gateway,auth-service,product-service,order-service,payment-service,delivery-service}`,
+  프론트 `commerce-foundry-{storefront,admin}`. Script Path 는 `Jenkinsfile-<module>`. operations-service 잡은 앱 레포 #212 뒤에 더합니다.
+- 소스 설정은 앱 레포 `backend/docs/jenkins-cicd-guide.md` §3 을 따릅니다 — 모든 브랜치 발견, origin PR(merge) 발견, **fork PR 발견 없음**(공개 저장소),
+  `main develop PR-*` 만, **Suppress automatic SCM triggering**(첫 인덱싱이 브랜치마다 빌드를 띄우지 않게), GitHub App `github-app-followfollowme-jenkins`.
+- Vault credential 은 폴더 범위(`vault/README.md` commerce-foundry 절). 전역 env `VAULT_ADDR` 를 이 프로젝트 때문에 추가했습니다.
+- 첫 배포는 이전 성공 빌드가 없어 자동 배포하지 않습니다 — 잡의 `develop` 에서 **Build with Parameters → `FORCE_DEPLOY=true`** 로
+  service-discovery → api-gateway → auth → product · delivery → order · payment → storefront · admin 순서로 실행합니다.

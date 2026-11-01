@@ -1149,3 +1149,51 @@ docker exec -it -e CONFIRM_RESET_KV=sneezecast vault sh /vault/scripts/reset-kv-
 ```
 
 `REPORTER_KEY_PEPPER` 도 함께 지워집니다. 실행 전에 오프라인 사본이 있는지 확인합니다.
+
+## commerce-foundry(MOKOYURI) Secret Path
+
+같은 Vault 인스턴스와 `kv` mount 를 공유하고 policy / AppRole / 경로만 분리합니다. 환경당 secret 하나입니다.
+
+```text
+kv/commerce-foundry/backend/{dev,prod}/env    # 백엔드 7종 공용 — 키 목록 정본: 앱 레포 backend/.env.example
+kv/commerce-foundry/frontend/{dev,prod}/env   # storefront · admin 공용 — 키 목록 정본: 앱 레포 frontend/.env.example
+```
+
+**혼디가개와 달리 백엔드 · 프론트 AppRole 을 나눕니다.** 프론트 잡이 백엔드 시크릿(JWT 개인키 · DB 비밀번호)을 읽지 못하게 하려는 것입니다.
+
+| AppRole · policy | 쓰는 곳 | Jenkins credential (폴더 `commerce-foundry` 범위) | 읽는 경로 |
+| --- | --- | --- | --- |
+| `jenkins-commerce-foundry` | 백엔드 잡 7개 | `commerce-foundry-vault-role-id` · `-secret-id` | `kv/commerce-foundry/backend/*` |
+| `jenkins-commerce-foundry-frontend` | 프론트 잡 2개 | `commerce-foundry-frontend-vault-role-id` · `-secret-id` | `kv/commerce-foundry/frontend/*` |
+| `ui-commerce-foundry` | Web UI 계정 | — | `kv/commerce-foundry/*` 관리 |
+
+- credential 은 전역이 아니라 **Jenkins 폴더 `commerce-foundry` 범위**에 둡니다. 다른 프로젝트 잡이 쓰지 못합니다.
+- Vault 주소는 Jenkins **전역 환경변수 `VAULT_ADDR`**(`https://vault.8llow8llowme.com`, 2026-11-01 추가)로 받습니다. 다른 프로젝트는
+  잡 파라미터 `VAULT_ADDR` 를 쓰므로 영향이 없습니다(파라미터가 전역 env 보다 우선).
+- 값에 작은따옴표 · `$` 를 넣지 않습니다. 파이프라인이 `.env.runtime` 을 `KEY='value'` 로 씁니다.
+
+### dev 값 (2026-11-01)
+
+| 키 | 값 · 출처 |
+| --- | --- |
+| `SPRING_PROFILES_ACTIVE` · `TIME_ZONE` · `COMMERCE_DOCKER_NETWORK` | `dev` · `Asia/Seoul` · `commerce-foundry` |
+| `EUREKA_HOST` | `commerce-service-discovery-dev` |
+| `DB_URL` · `DB_USERNAME` · `DB_PASSWORD` | main-server `~/infra/PostgreSQL/.env.commerce-foundry-dev` (PostgreSQL README) |
+| `REDIS_HOST` · `REDIS_PORT` · `REDIS_PASSWORD` | `192.168.0.11` · `6379` · main-server `~/infra/redis/.env` 의 `REDIS_MASTER_PASSWORD` |
+| `SNOWFLAKE_DATACENTER_ID` | dev `1` (prod 는 다른 값) |
+| `KAFKA_*` · `MESSAGING_ENABLED` | `.10` EXTERNAL 리스너 3개, namespace `commerce-foundry.dev`, 메시징은 `false` 로 시작 |
+| `EUREKA_PASSWORD` · `INTERNAL_JWT_SECRET` · `AUTH_LOGIN_GUARD_HASH_KEY` · `AUTH_OTP_SECRET_KEY` · `JWT_*` | 생성값(앱 레포 `security-guide.md` 규칙). **`AUTH_OTP_SECRET_KEY` 는 잃으면 관리자 OTP 를 모두 다시 등록해야 합니다** |
+| `ADMIN_SEED_*` | 최초 관리자. 첫 배포로 관리자를 만든 뒤 비웁니다(앱 레포 `deploy-guide.md` §4-3) |
+| `<MODULE>_PORT_DEV` | README 8절 dev 포트(2761 · 2000 · 2081~2085). 반대 환경 포트는 넣지 않습니다(파이프라인이 `'0'` 으로 채움) |
+| 프론트 `STOREFRONT_BIND_DEV` · `ADMIN_BIND_DEV` | `192.168.0.13` — nginx 가 `.12` 에 있어 루프백(기본값)이면 닿지 않습니다 |
+| 프론트 `GATEWAY_URL` | `http://commerce-api-gateway-dev:8000` (같은 docker 네트워크) |
+
+## commerce-foundry Bootstrap
+
+```bash
+# ai-host. 정책 · AppRole 을 만들고 UI 계정에 ui-commerce-foundry 를 더합니다(기존 정책 유지). 여러 번 실행해도 됩니다.
+docker exec -e VAULT_TOKEN='<root-token>' -e VAULT_UI_USERNAME=followfollowme vault sh /vault/scripts/bootstrap-commerce-foundry.sh
+```
+
+secret-id 회전은 다른 프로젝트와 같이 `rotate-approle-secret.sh jenkins-commerce-foundry` (프론트는 `jenkins-commerce-foundry-frontend`) 후
+Jenkins 폴더 credential 을 교체합니다.
