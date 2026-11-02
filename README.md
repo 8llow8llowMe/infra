@@ -281,9 +281,10 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | service-discovery | `192.168.0.13` | 2761 | |
 | api-gateway | `192.168.0.13` | 2000 | 외부 진입점(nginx → 게이트웨이) |
 | auth / product / order / payment / delivery | `192.168.0.13` | 2081 / 2082 / 2083 / 2084 / 2085 | |
-| operations(작업 · 알림, 추가 예정) | `192.168.0.13` | 2086 | 앱 레포 #212 |
+| operations(작업 · 알림, 추가 예정) | `192.168.0.13` | 2086 | 앱 레포 #212 — compose 가 아직 없어 잡 미등록 |
+| support(상담, 2026-11-02 첫 배포) | `192.168.0.13` | 2087 | prod `1087`. 잡 `commerce-foundry-support-service` |
 | 프론트 storefront / admin | `192.168.0.13` | 2300 / 2301 | |
-| PostgreSQL | `192.168.0.11` | 5432 | DB `commerce_foundry`, 계정 `commerce_dev`, 스키마 `auth` · `product` · `orders` · `payment` · `delivery` · `operations` |
+| PostgreSQL | `192.168.0.11` | 5432 | DB `commerce_foundry`, 계정 `commerce_dev`, 스키마 `auth` · `product` · `orders` · `payment` · `delivery` · `operations` · `support`(2026-11-02) |
 
 - 메모리: 백엔드 JVM 8개 × ~384MB + Next.js 2개 × ~256MB ≈ **3.6Gi(추정)**. sneezecast 배포가 보류돼(2026-10-30, 재개 가능 — 설정 유지) 지금 `.13` 에는 commerce-foundry 만 올라간다 — available 7.2Gi(2026-10-30 실측) 중 절반이다. 그래도 컨테이너마다 `mem_limit` 을 건다.
 - 프론트는 aarch64 라 x86_64 빌더 산출물의 네이티브 모듈을 그대로 쓰지 않는다(4절 6번) — 배포 호스트에서 이미지를 빌드한다(앱 레포 #199).
@@ -324,6 +325,7 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | --- | --- |
 | Jenkins 빌더 · Vault | `.10` 공유 |
 | Redis | 3노드 센티널 공유 — 키 prefix 로 프로젝트를 나눈다 |
+| Kafka | `.10` 공유 클러스터 EXTERNAL 리스너(`192.168.0.10:19092/29092/39092`). 토픽 namespace `commerce-foundry.<env>` — 앱이 만들지 않으므로 앱 레포 `backend/docker/kafka/topics.txt` 가 바뀌면 여기서 만든다(파티션 dev 3 · prod 6, RF 3, `<토픽>.dlt` 함께). dev 4개 + DLT 생성 · order · payment `MESSAGING_ENABLED=true`(2026-11-02, 결제 승인 소비 gate 는 앱 결정대로 OFF) |
 | MinIO | `.12`, 버킷 `commerce-foundry`(dev · prod 접두어) — 앱 레포 #9 이미지 업로드 |
 | Vault 경로(예정) | `kv/commerce-foundry/backend/{dev,prod}/env` · `kv/commerce-foundry/frontend/{dev,prod}/env`, AppRole `jenkins-commerce-foundry`, credential `commerce-foundry-vault-*` |
 | 배포 lock(예정) | `commerce-foundry-backend-deploy` · `commerce-foundry-frontend-deploy` |
