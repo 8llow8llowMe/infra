@@ -71,4 +71,4 @@ README에는 날짜를 붙인 실측값을 적습니다. "사용자 진술 기�
 
 ## 이슈·PR
 
-`.github/ISSUE_TEMPLATE/`(feature·bug)과 `.github/PULL_REQUEST_TEMPLATE.md`를 따릅니다. 작성 절차는 `issue`·`pr` 스킬(`/issue`, `/pr`)에 있습니다. Claude Code용 `.claude/skills/`는 Codex·Cursor용 `.agents/skills/`와 내용이 같은 사본이므로, 한쪽을 고치면 다른 쪽도 같이 고칩니다. 기본 브랜치는 `main`이고 작업 브랜치는 `<type>/infra/<이슈번호>-<slug>` 형식입니다(예: `feature/infra/11-ollama-stability-collaboration`). 실행하지 못한 검증 항목은 체크하지 않고 이유를 적습니다.
+`.github/ISSUE_TEMPLATE/`(feature·bug)과 `.github/PULL_REQUEST_TEMPLATE.md`를 따릅니다. 작성 절차는 `issue`·`pr` 스킬(`/issue`, `/pr`)에 있습니다. 설정 변경 · 서버 반영 · 장애 대응은 `infra-orchestrator` 스킬(`/infra-orchestrator`)의 순서(실측 → 계획 → 로컬 검사 → 호스트별 적용 → PR → 머지 뒤 동기화 · 정리)를 따릅니다. Claude Code용 `.claude/skills/`는 Codex·Cursor용 `.agents/skills/`와 내용이 같은 사본이므로, 한쪽을 고치면 다른 쪽도 같이 고칩니다. 기본 브랜치는 `main`이고 작업 브랜치는 `<type>/infra/<이슈번호>-<slug>` 형식입니다(예: `feature/infra/11-ollama-stability-collaboration`). 실행하지 못한 검증 항목은 체크하지 않고 이유를 적습니다.

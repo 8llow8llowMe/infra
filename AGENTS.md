@@ -29,7 +29,7 @@ There is no central test suite or coverage target. For each change, run syntax o
 
 Recent commits use `[INFRA] type: description`, with types such as `feat`, `fix`, and `docs`; follow that pattern. Keep commits focused by component or operational change. Pull requests should explain the affected hosts, configuration changes, validation results, deployment and rollback steps, and related issue when applicable. Add screenshots for visible Grafana or web UI changes.
 
-The `issue` and `pr` skills exist twice with identical content: `.agents/skills/` for Codex and Cursor, `.claude/skills/` for Claude Code. When you change one copy, apply the same change to the other.
+The `issue`, `pr`, and `infra-orchestrator` skills exist twice with identical content: `.agents/skills/` for Codex and Cursor, `.claude/skills/` for Claude Code. When you change one copy, apply the same change to the other.
 
 ## Security & Configuration
 
