@@ -69,7 +69,7 @@ Compose 파일에는 기본값을 넣지 않습니다. 실행 전에 `.env`를 �
 | `OPEN_WEBUI_CONTAINER_DATA_DIR` | 컨테이너 WebUI 데이터 경로 | `/app/backend/data` |
 | `WEBUI_SECRET_KEY` | WebUI 세션 암호화 키 | 긴 랜덤 문자열 |
 | `AMD_GPU_DRI_DEVICE` | 컨테이너에 전달할 DRI 장치 | `/dev/dri` |
-| `AMD_GPU_RENDER_GROUP` | render 그룹 GID (비우면 자동 해석) | `110` |
+| `AMD_GPU_RENDER_GROUP` | render 그룹 GID (비우면 `install-ollama.sh` 만 자동 해석 — `docker compose up` 직접 실행 시 필수) | `110` (ollama-01 은 `993`) |
 | `TZ` | 컨테이너 타임존 | `Asia/Seoul` |
 
 `WEBUI_SECRET_KEY` 는 운영 전에 반드시 바꿉니다.

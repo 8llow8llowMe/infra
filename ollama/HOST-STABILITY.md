@@ -54,6 +54,24 @@ docker compose --env-file .env -f docker-compose-jenkins-builder-agent.yml up -d
 
 `docker inspect -f '{{.HostConfig.Memory}} {{.HostConfig.MemorySwap}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' <container>`와 `docker stats`로 상한 반영을 확인한다. `memswap_limit=mem_limit`로 이 컨테이너의 swap 사용을 막아 추론/빌드가 디스크 swap으로 느려지는 상황을 피한다. 상한에 도달한 작업은 OOM으로 종료될 수 있다. `MemAvailable`이 동시 부하 중 3Gi 아래로 지속되면 builder 분리 또는 서비스 이전을 우선한다.
 
+### 적용 기록 (2026-11-04, #57)
+
+이 절의 상한은 문서에만 있었고 **호스트에는 한 번도 적용되지 않았습니다.** 호스트의 `~/infra` 가 레포 복사본(예전 판)이라 compose 파일에 `mem_limit` 줄이 없었습니다(#55).
+
+| 컨테이너 | 적용 전 | 적용 후 | 방법 |
+| --- | --- | --- | --- |
+| `ollama` | 무제한 | 17Gi · cpus 8 · `MAX_LOADED_MODELS=1` · `CONTEXT_LENGTH=4096` · `MAX_QUEUE=16` | 레포 compose 반영 후 재생성 |
+| `open-webui` | 무제한 | 1Gi | 같은 compose |
+| `jenkins-builder-agent` | 무제한, `GRADLE_OPTS` 없음 | 3Gi · cpus 4 · pids 1024 · `workers.max=2` · daemon 끔 | 레포 compose 반영 후 재생성(`--no-build`) |
+| `jenkins-controller` | 무제한 | **3Gi** · cpus 2 | `docker update` (재시작 없음). 호스트 JVM 이 `-Xmx2048m` 이라 기본 2.5Gi 대신 3Gi, 호스트 `.env` 에 `JENKINS_CONTROLLER_MEM_LIMIT=3g` |
+
+- 컨텍스트는 적용 전에도 `OLLAMA_CONTEXT_LENGTH:0`(기본값) → 실제 `n_ctx = 4096` 이었습니다. 4096 을 명시해도 동작은 같습니다.
+- 적용 직후 `gpt-oss:20b` 로드: `size_vram` 12.7GB(GTT), `context_length` 4096, 첫 응답 21.9초. 컨테이너 RSS 는 1.8GiB 로, 모델은 cgroup 메모리가 아니라 GTT 에 잡힙니다.
+- 호스트: 적용 전 used 21Gi · **swap 5.5Gi**, 적용 후 used 17Gi · swap 2.7Gi · available 13Gi.
+- **재생성 때 `AMD_GPU_RENDER_GROUP` 이 비어 있으면 ollama 가 `Unable to find group` 으로 뜨지 않습니다.** 자동 해석은 `install-ollama.sh` 안에서만 일어나므로 `docker compose up` 을 직접 쓸 때는 `.env` 에 숫자 GID 를 넣어 둡니다(ollama-01 = `993`). 이번에 약 1분 내려갔습니다.
+- builder 재생성 때 24시간째 멈춰 있던 commerce-foundry product-service PR-535 · PR-537 빌드(둘 다 PR 은 이미 머지)가 함께 정리됐습니다.
+- controller 의 compose 는 아직 예전 단일 파일(`docker-compose-jenkins.yml`, 프로젝트명 `jenkins`)입니다. `docker-compose-jenkins-controller.yml` 로의 이관은 #55 에서 합니다. 그 전에 controller 를 compose 로 재생성하면 `docker update` 값이 사라집니다.
+
 ## 3. BIOS UMA
 
 8GB 고정 UMA가 GPU의 연산 능력이나 RAM 대역폭 자체를 올려주지는 않는다. 그러나 GPU가 모델을 어디에 적재하는지와 Ollama가 보고받는 VRAM 크기는 바꿀 수 있다. `gpt-oss:20b`는 약 14GB이므로 **8GB UMA만으로도 전체 모델이 고정 GPU 영역에 들어가지 않는다.** GTT 또는 CPU 메모리를 함께 쓸 수 있으며, 실제 배치는 `ollama ps`의 `PROCESSOR`로 확인한다. `radeontop` 등의 GPU 사용률 100%는 모델이 100% GPU에 적재되었다는 뜻이 아니다.
