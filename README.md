@@ -39,7 +39,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.11` main-server | BossPickSeoul **dev 백엔드**, 혼디가개 **dev 백엔드 · 프론트**, mysql, **postgresql**(2026-10-23, commerce-foundry dev DB), redis-node1 + sentinel1, backend-dev-agent, frontend-dev-agent |
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
 | `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정. sneezecast 는 2026-10-30 배포 보류 — 설정은 유지), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
-| `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측) |
+| `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측), cloudflare-ddns(예정 — Cloudflare 로 옮긴 zone 부터, #59) |
 | `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10) |
 
 **혼디가개 prod DB 는 `backend-server` 가 아니라 `.11` main-server 의 mysql 에 있습니다** (스키마 `hondigagae_{auth,tour,plan}_prod`, 2026-10-10 생성). 아래 4절 2번 "dev 와 prod 는 호스트를 공유하지 않는다" 의 예외로, 애플리케이션은 분리하고 DB 인스턴스만 dev 와 함께 씁니다. 그래서 `.11` mysql 의 재시작 · 디스크 · 백업이 prod 에도 영향을 줍니다.
@@ -378,6 +378,7 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | `fail2ban/`, `logrotate/` | 보안·로그 관리 |
 | `searxng/` | 메타 검색 |
 | `docker/` | Docker Engine 설치 스크립트 (arch 자동 분기) |
+| `ddns/` | Cloudflare DDNS — 공인 IP 변경 시 A 레코드 자동 갱신 (DNS only, 무료) |
 
 ---
 
@@ -390,8 +391,8 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 
 | 순서 | 위치 | 할 일 | 자동화 |
 | --- | --- | --- | --- |
-| 1 | 도메인 DNS A 레코드 (`8llow8llowme.com` · `mokoyuri.shop` · `hondigagae.com` · `bosspickseoul.com`) | 새 IP 로 갱신 | Cloudflare DDNS 로 자동화 예정(#59). 그 전엔 가비아에서 수동 |
-| 2 | `fail2ban/jail.local` 의 `ignoreip` | 새 IP 로 바꾸고 storage 에 반영 · `docker exec fail2ban fail2ban-client reload` | 수동 |
+| 1 | 도메인 DNS A 레코드 (`8llow8llowme.com` · `mokoyuri.shop` · `hondigagae.com` · `bosspickseoul.com`) | 새 IP 로 갱신 | Cloudflare DDNS 로 자동화 예정([`ddns/`](ddns/README.md), #59). zone 을 옮기기 전엔 가비아에서 수동 |
+| 2 | `fail2ban/jail.local` 의 `ignoreip` | 새 IP 로 바꾸고 storage 에서 `git pull` 뒤 `docker compose -f docker-compose-fail2ban.yml up -d --build` (설정이 이미지에 COPY 되므로 reload 만으로는 반영되지 않음) | 수동 |
 | 3 | 외부 API 의 IP 허용 목록 (카카오 · 공공데이터 등 키에 서버 IP 제한을 건 곳) | 새 IP 등록 | 수동 · **목록 미작성** — 등록한 곳이 생기면 여기에 적습니다 |
 | 4 | 작업 PC 의 SSH 설정 (`HostName`) | 새 IP 로 바꿈 | 수동 |
 | 5 | 공유기 포트포워딩 | 사설 IP 기준이라 보통 그대로. 공유기 · 모뎀을 교체했다면 다시 확인 | 수동 |
