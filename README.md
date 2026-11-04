@@ -50,6 +50,31 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 
 Redis 는 3노드 센티널이라 `.11` / `.13` / `.12` 에 한 대씩 나눠 두고 quorum 2 로 운영합니다. Kafka 는 3브로커지만 노드당 1GB 라 나눌 여유가 있는 호스트가 없어 `ollama-01` 단일 호스트에 묶여 있습니다.
 
+### 호스트의 `~/infra` (2026-11-04, #55)
+
+**2026-11-04 전까지 6대 모두 `~/infra` 가 git clone 이 아니라 레포 일부를 손으로 복사한 디렉터리였습니다.** 그래서 `git pull` 로 반영할 수 없었고, 레포와 서로 반대 방향으로 벌어져 있었습니다(CR 제거 후 md5 비교: ollama-01 34 · storage 23 · main-server 10 · backend-1 5 · backend-server 3 · deploy 2 파일).
+
+- 레포가 앞선 것: ollama · builder 자원 상한(#57), redis 로그 상한, nginx BossPickSeoul SSE 라우트, jenkins agent 설치 스크립트, promtail fail2ban 수집 등 → 호스트에 반영했습니다. compose 파일은 다음 재생성 때 적용되고, nginx 는 `nginx -t` 뒤 reload 로 바로 적용했습니다.
+- 서버가 앞선 것: `nginx/conf.d/ai.conf`(open-webui, 레포에 없었음), `nginx/conf.d/dev.bosspickseoul.conf`(레포는 HTTPS 블록이 주석인 "인증서 발급 전" 판) → 레포로 가져왔습니다.
+  - 동기화 중 레포 판 `dev.bosspickseoul.conf` 를 먼저 덮어써 `https://dev.bosspickseoul.com` 이 약 5분 동안 다른 인증서(SNI 기본 서버)를 받았습니다. 백업본으로 되돌린 뒤 24개 도메인의 SNI 인증서를 전수 확인했습니다.
+- 반영 전 파일은 각 호스트 `~/backups/infra-20261104/sync55-before.tgz` 에 있습니다.
+
+그 뒤 각 호스트의 `~/infra` 를 **git 작업 트리로 바꿨습니다**(`git init` → `fetch` → `reset --mixed origin/main`, 파일은 건드리지 않음 · 없던 레포 파일만 checkout). 이제 반영은 `cd ~/infra && git pull` 이고, `git status` 가 레포와의 차이를 보여 줍니다. `.env` · 데이터 디렉터리는 각 컴포넌트 `.gitignore` 로 빠집니다.
+
+> **주의 — 바인드 마운트된 디렉터리는 "레포 파일 = 바로 적용"입니다.** storage 의 `nginx/conf.d` 는 디렉터리째 마운트돼 `*.conf` 를 전부 include 합니다. 없던 파일을 checkout 하면서 `jamjamnow.conf` · `api-dev.sneezecast.conf`(인증서 없음, upstream 미해석)가 생겨 `nginx -t` 가 실패했습니다. reload 전에 잡아 운영 영향은 없었지만, 그 상태로 nginx 가 재시작됐으면 전 도메인이 내려갔습니다. 두 파일은 지우고 `git update-index --skip-worktree` 로 표시했습니다. **storage 에서 `git pull` 한 뒤에는 반드시 `docker exec nginx nginx -t` 부터** 돌리고, 새 conf 는 CLAUDE.md 의 "HTTPS 블록 주석 → 발급 → 해제" 순서를 지킵니다.
+
+전환 직후 남은 **의도된 차이**는 아래뿐입니다. 이 표에 없는 `M` 이 보이면 서버에서 직접 고친 것이니 레포로 올리거나 되돌립니다.
+
+| 호스트 | 파일 | 이유 |
+| --- | --- | --- |
+| storage | `redis/docker-compose-redis-slave.yml` | storage 는 node3 이라 이 파일을 node3 · `external` 네트워크로 고쳐 기동했습니다. 레포의 `docker-compose-redis-slave2.yml` 과 같은 역할입니다. 다음 재생성 때 `slave2.yml` 로 옮기면 차이가 없어집니다 |
+| storage | `fail2ban/jail.local` | #56(공인 IP) 이 머지되면 사라집니다 |
+| storage | `nginx/conf.d/dev.bosspickseoul.conf` | 이 PR(#55) 이 머지되면 사라집니다 |
+| storage | `nginx/conf.d/jamjamnow.conf` · `nginx/conf.d/api-dev.sneezecast.conf` | 운영하지 않는 도메인(jamjamnow NS 없음 · sneezecast 배포 보류). 호스트에서 지우고 skip-worktree. 다시 쓸 때 `git update-index --no-skip-worktree` 후 발급 절차대로 |
+| ollama-01 | `searxng/config/settings.yml` | 끝 빈 줄 하나. 파일이 컨테이너 uid(977) 소유라 쓰지 않았습니다 |
+
+ollama-01 의 Jenkins controller 는 아직 레포에 없는 예전 파일(`jenkins/docker-compose-jenkins.yml` · `jenkins.Dockerfile`, untracked)로 떠 있습니다. `docker-compose-jenkins-controller.yml` 로 옮기는 일은 따로 합니다(재생성 필요).
+
 ---
 
 ## 3. BossPickSeoul 운영 백엔드는 어디에 두는가
