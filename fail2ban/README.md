@@ -27,7 +27,7 @@ storage(`192.168.0.12`) nginx 의 `access.log` 를 읽어 스캐너 · 공격 �
 
 - 차단 시간은 **첫 1시간, 다시 걸릴 때마다 두 배(모든 jail 합산), 최대 30일** 입니다(`bantime.increment`). 이력은 `./fail2ban-data` 의 DB 에 30일 남습니다.
 - **막지 않는 것:** 검색엔진 · AI 크롤러 · `curl` 같은 일반 UA, `login` · `admin` · `dashboard` 같은 일반 단어 경로, 200 응답. #37 전에는 이것들로 Googlebot 37 · Meta 156 · OpenAI 40 개 IP 가 7일씩 차단 목록에 있었고, 혼디가개 `/login` 을 연 사용자도 1번에 7일 막혔습니다.
-- **예외(`ignoreip`):** 내부망 `10/8` · `172.16/12`(docker 브리지) · `192.168/16`, 공인 IP `1.235.23.72`, Cloudflare 대역.
+- **예외(`ignoreip`):** 내부망 `10/8` · `172.16/12`(docker 브리지) · `192.168/16`, 공인 IP `1.241.243.70`(2026-11 에 `1.235.23.72` 에서 바뀜, #56 — 바뀔 때 절차는 루트 README 10절), Cloudflare 대역.
 
 ### Cloudflare
 
