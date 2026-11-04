@@ -635,7 +635,7 @@ docker exec nginx nginx -t && docker exec nginx nginx -s reload
 개인 도구. upstream 은 backend-server 웹 컨테이너 `192.168.0.9:10088` 하나다. SSE 를 쓰므로 `proxy_buffering off` · `proxy_read_timeout 1h`.
 웹 컨테이너가 이 호스트의 `X-Real-IP` 만 클라이언트 주소로 믿으므로 헤더를 빼지 않는다(앱 로그인 시도 제한이 IP 단위다).
 
-`conf.d/trading.8llow8llowme.conf` 는 **HTTPS 블록이 주석 처리된 상태로 커밋**되어 있다. 적용 순서:
+인증서는 2026-11-04 발급했고(Let's Encrypt, 만료 2027-02-02 — certbot 갱신 루프가 연장) HTTPS 블록을 풀었다. 처음 적용할 때의 순서(기록):
 
 ```bash
 cd ~/infra && git pull
