@@ -8,7 +8,7 @@ Redis master 1 + replica 2 + Sentinel 3노드 구성입니다.
 | --- | --- | --- |
 | `redis-node1` + `redis-sentinel-node1` (master) | main-server (192.168.0.11) | `docker-compose-redis-master.yml` |
 | `redis-node2` + `redis-sentinel-node2` (replica) | backend-1 (192.168.0.13) | `docker-compose-redis-slave.yml` |
-| `redis-node3` + `redis-sentinel-node3` (replica) | storage (192.168.0.12) | `docker-compose-redis-slave.yml` (storage 실제 기동 파일) |
+| `redis-node3` + `redis-sentinel-node3` (replica) | storage (192.168.0.12) | `docker-compose-redis-slave.yml` (storage 실제 기동 파일 — 호스트에서 node3 · `external` 네트워크로 고친 판, 레포의 `slave2.yml` 과 같은 역할. 루트 README 2절 "호스트의 ~/infra") |
 
 - Sentinel quorum 은 `2` (`sentinel.conf`) — 3노드 중 2노드 합의로 failover 가 성립합니다.
 - master/replica 주소는 `redis-slave.conf` 의 `replicaof` 와 `sentinel.conf` 의 `sentinel monitor` 가 기준입니다.
