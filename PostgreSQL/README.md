@@ -34,6 +34,11 @@ PROJECT_DB_PASSWORD='<Vault 의 DB_PASSWORD 와 같은 값>' \
   sh scripts/create-project-db.sh commerce_foundry commerce_dev auth product orders payment delivery operations
 ```
 
+```bash
+# trading-desk(개인 도구) — 2026-11-04 생성, #68. 비밀번호는 backend-server ~/deploy/trading-desk/.env.runtime 에만 있다
+PROJECT_DB_PASSWORD='<값>' sh scripts/create-project-db.sh trading_desk trading_desk desk
+```
+
 - 스키마를 추가하면 같은 명령에 이름을 더해 다시 실행합니다(이미 있는 것은 건너뜀).
 - 같은 명령을 다른 비밀번호로 실행하면 계정 비밀번호가 그 값으로 바뀝니다 — 비밀번호 교체 절차입니다.
 - main-server 의 `~/infra/PostgreSQL/.env.commerce-foundry-dev`(권한 600)에 접속 값(DB_URL · DB_USERNAME · DB_PASSWORD)을 두었습니다. **Vault `kv/commerce-foundry/backend/dev/env` 에 옮긴 뒤 지워도 됩니다.**
