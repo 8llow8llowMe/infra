@@ -351,3 +351,23 @@ prod 의 DB 위치는 아직 정하지 않았습니다.
 | `fail2ban/`, `logrotate/` | 보안·로그 관리 |
 | `searxng/` | 메타 검색 |
 | `docker/` | Docker Engine 설치 스크립트 (arch 자동 분기) |
+
+---
+
+## 10. 공인 IP 가 바뀌면
+
+집 회선(SK브로드밴드)은 **동적 공인 IP** 입니다. 요금제 · 장비를 바꾸지 않아도 통신사 장비 작업이나 DHCP 재할당으로 바뀔 수 있습니다.
+2026-11 초 `1.235.23.72` → `1.241.243.70` 으로 바뀌었습니다(기사 방문 직후, #56). 원인은 확인하지 않았습니다.
+
+공인 IP 가 쓰이는 곳은 아래가 전부입니다(2026-11-04 레포 · 서버 실측). 바뀌면 위에서부터 확인합니다.
+
+| 순서 | 위치 | 할 일 | 자동화 |
+| --- | --- | --- | --- |
+| 1 | 도메인 DNS A 레코드 (`8llow8llowme.com` · `mokoyuri.shop` · `hondigagae.com` · `bosspickseoul.com`) | 새 IP 로 갱신 | Cloudflare DDNS 로 자동화 예정(#59). 그 전엔 가비아에서 수동 |
+| 2 | `fail2ban/jail.local` 의 `ignoreip` | 새 IP 로 바꾸고 storage 에 반영 · `docker exec fail2ban fail2ban-client reload` | 수동 |
+| 3 | 외부 API 의 IP 허용 목록 (카카오 · 공공데이터 등 키에 서버 IP 제한을 건 곳) | 새 IP 등록 | 수동 · **목록 미작성** — 등록한 곳이 생기면 여기에 적습니다 |
+| 4 | 작업 PC 의 SSH 설정 (`HostName`) | 새 IP 로 바꿈 | 수동 |
+| 5 | 공유기 포트포워딩 | 사설 IP 기준이라 보통 그대로. 공유기 · 모뎀을 교체했다면 다시 확인 | 수동 |
+
+- Let's Encrypt 인증서는 도메인 기준(HTTP-01)이라 DNS 만 맞으면 갱신에 영향이 없습니다.
+- 앱 코드 · nginx · Jenkins 는 도메인이나 사설 IP 만 씁니다. 공인 IP 를 새로 쓰게 되면 이 표에 행을 더합니다.
