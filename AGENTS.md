@@ -29,6 +29,8 @@ There is no central test suite or coverage target. For each change, run syntax o
 
 Recent commits use `[INFRA] type: description`, with types such as `feat`, `fix`, and `docs`; follow that pattern. Keep commits focused by component or operational change. Pull requests should explain the affected hosts, configuration changes, validation results, deployment and rollback steps, and related issue when applicable. Add screenshots for visible Grafana or web UI changes.
 
+The `issue` and `pr` skills exist twice with identical content: `.agents/skills/` for Codex and Cursor, `.claude/skills/` for Claude Code. When you change one copy, apply the same change to the other.
+
 ## Security & Configuration
 
 Never commit `.env` files, Vault tokens, agent secrets, or generated data. Use the component's `.env.example` as a template and keep real credentials in the intended secret store. Review `docker compose config` output before sharing it because resolved environment values can contain secrets.
