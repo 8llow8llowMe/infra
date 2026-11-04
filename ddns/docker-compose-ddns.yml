@@ -1,0 +1,43 @@
+# Cloudflare DDNS — 집 회선의 동적 공인 IP 가 바뀌면 Cloudflare DNS A 레코드를 새 IP 로 고칩니다 (#59).
+# - 레코드는 전부 DNS only(회색 구름, PROXIED=false)로 둡니다. 트래픽이 Cloudflare 를 거치지 않아 무료 플랜의 사용량 제한 · 약관과 무관합니다.
+# - 공인 IP 확인은 1.1.1.1/cdn-cgi/trace(API 아님)로 하고, Cloudflare API 는 IP 가 바뀌었을 때만 부릅니다.
+# - 토큰은 환경변수가 아니라 파일(./secrets/cloudflare-api-token)로 넣습니다. docker inspect 에 값이 남지 않습니다.
+services:
+  cloudflare-ddns:
+    image: ${DDNS_IMAGE:-favonia/cloudflare-ddns:1.17.1}
+    container_name: ${DDNS_CONTAINER_NAME:-cloudflare-ddns}
+    restart: unless-stopped
+    user: "${DDNS_UID:-1000}:${DDNS_GID:-1000}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${DDNS_MEM_LIMIT:-64m}
+    memswap_limit: ${DDNS_MEM_LIMIT:-64m}
+    cpus: ${DDNS_CPUS:-0.25}
+    environment:
+      CLOUDFLARE_API_TOKEN_FILE: /run/secrets/cloudflare-api-token
+      DOMAINS: ${DDNS_DOMAINS:?DDNS_DOMAINS 를 .env 에 적습니다}
+      PROXIED: "false"
+      IP6_PROVIDER: none
+      UPDATE_CRON: ${DDNS_UPDATE_CRON:-@every 1m}
+      UPDATE_ON_START: "true"
+      DELETE_ON_STOP: "false"
+      TTL: ${DDNS_TTL:-60}
+      RECORD_COMMENT: ${DDNS_RECORD_COMMENT:-managed by Infra ddns (cloudflare-ddns)}
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - ./secrets/cloudflare-api-token:/run/secrets/cloudflare-api-token:ro
+    networks:
+      - 8llow8llowme-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  8llow8llowme-net:
+    name: 8llow8llowme-net
+    driver: bridge
