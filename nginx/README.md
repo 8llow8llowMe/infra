@@ -629,3 +629,25 @@ docker exec nginx nginx -t && docker exec nginx nginx -s reload
 
 - API: `/var/log/nginx/sneezecast_api_dev_access.log`
 - 전역 `/var/log/nginx/access.log` 에도 계속 기록된다
+
+## trading.8llow8llowme.com (trading-desk, #68)
+
+개인 도구. upstream 은 backend-server 웹 컨테이너 `192.168.0.9:10088` 하나다. SSE 를 쓰므로 `proxy_buffering off` · `proxy_read_timeout 1h`.
+웹 컨테이너가 이 호스트의 `X-Real-IP` 만 클라이언트 주소로 믿으므로 헤더를 빼지 않는다(앱 로그인 시도 제한이 IP 단위다).
+
+`conf.d/trading.8llow8llowme.conf` 는 **HTTPS 블록이 주석 처리된 상태로 커밋**되어 있다. 적용 순서:
+
+```bash
+cd ~/infra && git pull
+docker exec nginx nginx -t && docker exec nginx nginx -s reload      # HTTP 블록(챌린지 경로)만 살아 있다
+cd ~/infra/certbot && ./init-cert-non-www.sh trading.8llow8llowme.com
+# conf 의 HTTPS 블록 주석 해제(후속 커밋) → git pull
+docker exec nginx nginx -t && docker exec nginx nginx -s reload
+```
+
+fail2ban `nginx-trading-login`(로그인 401 · 429 반복)은 설정이 이미지에 COPY 되므로
+`cd ~/infra/fail2ban && docker compose -f docker-compose-fail2ban.yml up -d --build` 로 반영한다.
+
+### DNS 체크리스트
+
+- `trading` A -> 공개 Nginx 호스트 (가비아, 2026-11-04 등록)
