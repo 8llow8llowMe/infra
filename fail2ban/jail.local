@@ -76,6 +76,15 @@ logpath  = /var/log/nginx/access.log
 maxretry = 30
 findtime = 1m
 
+# 4. trading.8llow8llowme.com 로그인 실패 (#68) — 계정이 하나뿐인 개인 도구라 추측 시도를 길게 막는다.
+# 앱도 IP 당 15분 5회로 막지만(메모리, 재시작하면 잊는다) 여기는 bantime 증가 · recidive 로 오래 기억한다.
+[nginx-trading-login]
+enabled  = true
+filter   = nginx-trading-login
+logpath  = /var/log/nginx/access.log
+maxretry = 5
+findtime = 15m
+
 # ---------------------------------------------------------------------------
 # 상습범 — 하루에 3번 이상 차단된 IP 는 docker publish 포트 전체를 7일 막습니다.
 # ---------------------------------------------------------------------------
