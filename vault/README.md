@@ -1197,3 +1197,46 @@ docker exec -e VAULT_TOKEN='<root-token>' -e VAULT_UI_USERNAME=followfollowme va
 
 secret-id 회전은 다른 프로젝트와 같이 `rotate-approle-secret.sh jenkins-commerce-foundry` (프론트는 `jenkins-commerce-foundry-frontend`) 후
 Jenkins 폴더 credential 을 교체합니다.
+
+## trading-desk Secret Path
+
+개인 도구 trading-desk(앱 레포 `shindonggeun/trading-desk`, #70)도 같은 Vault 인스턴스와 `kv` mount 를 공유하고 policy / AppRole / 경로만 분리합니다.
+prod 만 있습니다(dev 환경 없음). 환경당 secret 하나, 키 하나에 값 하나입니다.
+
+```text
+kv/trading-desk/backend/prod/env    # 백엔드 compose 가 쓰는 키 전부(api · collector · analyst 공용) — 키 목록 정본: 앱 레포 루트 .env.example
+kv/trading-desk/frontend/prod/env   # 웹 compose 보간 키만: DESK_DOCKER_NETWORK · DESK_WEB_BIND · DESK_WEB_PORT (· DESK_WEB_MEM_LIMIT)
+```
+
+| AppRole · policy | 쓰는 곳 | Jenkins credential (폴더 `trading-desk` 범위) | 읽는 경로 |
+| --- | --- | --- | --- |
+| `jenkins-trading-desk` | 잡 `trading-desk-backend` · `trading-desk-web` | `trading-desk-vault-role-id` · `-secret-id` | `kv/data/trading-desk/+/+/env` (읽기만, 목록 없음) |
+| `ui-trading-desk` | Web UI 계정 | — | `kv/trading-desk/*` 관리 |
+
+- **AppRole 을 백엔드 · 웹으로 나누지 않습니다.** 두 잡이 같은 저장소의 같은 develop 에서 돌고, 같은 호스트(`.9`) agent 의 docker 소켓을 쓰므로 나눠도 막히는 것이 없습니다.
+- 앱은 Vault 를 직접 읽지 않습니다(env 로만 받음). 그래서 `backend-trading-desk` AppRole · 정책은 없습니다.
+- 값에 작은따옴표 · 줄바꿈을 넣지 않습니다. 파이프라인(앱 레포 `scripts/jenkins/vault-env.sh`)이 compose 가 쓰는 키만 `KEY='value'` 로 쓰고, 걸리면 키 이름만 알리고 멈춥니다.
+- 처음 값은 서버 `~/deploy/trading-desk/.env.runtime` 에서 옮깁니다 — 절차는 앱 레포 `docs/deploy.md` 3절(값을 화면 · 로그에 내지 않는 명령).
+- Vault 가 봉인 · 다운이면 배포만 멈추고 실행 중인 컨테이너는 그대로 돕니다(env 는 기동 때 컨테이너 설정에 들어가 있음).
+
+## trading-desk Bootstrap
+
+```bash
+# ai-host. 정책 · AppRole 을 만들고 UI 계정에 ui-trading-desk 를 더합니다(기존 정책 유지). 여러 번 실행해도 됩니다.
+docker exec -e VAULT_TOKEN='<root-token>' -e VAULT_UI_USERNAME=<UI 계정> vault sh /vault/scripts/bootstrap-trading-desk.sh
+# Jenkins 폴더 trading-desk 의 Secret text credential 두 개에 넣을 값(화면에만, 커밋 · 채팅 금지)
+docker exec -e VAULT_TOKEN='<root-token>' vault vault read -field=role_id auth/approle/role/jenkins-trading-desk/role-id
+docker exec -e VAULT_TOKEN='<root-token>' vault vault write -f -field=secret_id auth/approle/role/jenkins-trading-desk/secret-id
+```
+
+확인 — 정책만 붙은 5분짜리 토큰으로 권한을 봅니다(secret-id 를 쓰지 않습니다). 기대: `read` · `read` · `deny` · `deny`
+
+```bash
+docker exec -e VAULT_TOKEN='<root-token>' vault sh -c 'T=$(vault token create -policy=jenkins-trading-desk -ttl=5m -field=token); \
+  for p in trading-desk/backend/prod/env trading-desk/frontend/prod/env trading-desk/other commerce-foundry/backend/prod/env; do \
+    vault token capabilities "$T" "kv/data/$p"; done; vault token revoke "$T"'
+```
+
+secret-id 회전은 다른 프로젝트와 같이 `docker exec -it vault sh /vault/scripts/rotate-approle-secret.sh jenkins-trading-desk` 후
+Jenkins 폴더 `trading-desk` 의 `trading-desk-vault-secret-id` 를 교체합니다. 옛 secret-id 는 `secret_id_ttl="0"` 이라 저절로 만료되지 않으니,
+교체 뒤 `vault list auth/approle/role/jenkins-trading-desk/secret-id` 의 accessor 로 `vault write auth/approle/role/jenkins-trading-desk/secret-id-accessor/destroy secret_id_accessor=<accessor>` 합니다.
