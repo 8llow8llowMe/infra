@@ -8,7 +8,12 @@
 # kv 값은 만들지 않습니다 — kv put 은 secret 전체를 덮어씁니다. 값 넣기는 앱 레포 docs/deploy.md 3절.
 #
 # 사용:
-#   docker exec -e VAULT_TOKEN='<root-token>' vault sh /vault/scripts/bootstrap-trading-desk.sh
+#   read -rs VAULT_TOKEN && export VAULT_TOKEN   # root 토큰 — 명령 인자 · 셸 history 에 남기지 않습니다
+#   docker exec -e VAULT_TOKEN vault sh /vault/scripts/bootstrap-trading-desk.sh
+#   unset VAULT_TOKEN
+#
+# 로그인 토큰 수명은 10분(최대 30분)입니다 — 파이프라인은 env 를 한 번 읽고 바로 revoke-self 합니다.
+# secret_id 는 다른 프로젝트처럼 만료 없이 두고 rotate-approle-secret.sh 로 회전합니다(README trading-desk 절).
 #   기존 Web UI 계정에 ui-trading-desk 를 더하려면 VAULT_UI_USERNAME 을 함께 넘깁니다(기존 정책은 유지).
 
 set -eu
@@ -31,8 +36,8 @@ vault policy write ui-trading-desk /vault/policies/ui-trading-desk.hcl
 
 vault write auth/approle/role/jenkins-trading-desk \
   token_policies="jenkins-trading-desk" \
-  token_ttl="1h" \
-  token_max_ttl="4h" \
+  token_ttl="10m" \
+  token_max_ttl="30m" \
   secret_id_ttl="0" \
   secret_id_num_uses="0"
 

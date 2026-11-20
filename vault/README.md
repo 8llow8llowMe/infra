@@ -1221,21 +1221,29 @@ kv/trading-desk/frontend/prod/env   # 웹 compose 보간 키만: DESK_DOCKER_NET
 
 ## trading-desk Bootstrap
 
+root 토큰은 `read -s` 로 받아 이름만 쓴 `-e VAULT_TOKEN` 으로 넘깁니다 — 명령 인자(`ps`) · 셸 history 에 남지 않게.
+
 ```bash
 # ai-host. 정책 · AppRole 을 만들고 UI 계정에 ui-trading-desk 를 더합니다(기존 정책 유지). 여러 번 실행해도 됩니다.
-docker exec -e VAULT_TOKEN='<root-token>' -e VAULT_UI_USERNAME=<UI 계정> vault sh /vault/scripts/bootstrap-trading-desk.sh
+read -rs VAULT_TOKEN && export VAULT_TOKEN
+docker exec -e VAULT_TOKEN -e VAULT_UI_USERNAME=<UI 계정> vault sh /vault/scripts/bootstrap-trading-desk.sh
 # Jenkins 폴더 trading-desk 의 Secret text credential 두 개에 넣을 값(화면에만, 커밋 · 채팅 금지)
-docker exec -e VAULT_TOKEN='<root-token>' vault vault read -field=role_id auth/approle/role/jenkins-trading-desk/role-id
-docker exec -e VAULT_TOKEN='<root-token>' vault vault write -f -field=secret_id auth/approle/role/jenkins-trading-desk/secret-id
+docker exec -e VAULT_TOKEN vault vault read -field=role_id auth/approle/role/jenkins-trading-desk/role-id
+docker exec -e VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/jenkins-trading-desk/secret-id
 ```
 
 확인 — 정책만 붙은 5분짜리 토큰으로 권한을 봅니다(secret-id 를 쓰지 않습니다). 기대: `read` · `read` · `deny` · `deny`
 
 ```bash
-docker exec -e VAULT_TOKEN='<root-token>' vault sh -c 'T=$(vault token create -policy=jenkins-trading-desk -ttl=5m -field=token); \
+docker exec -e VAULT_TOKEN vault sh -c 'T=$(vault token create -policy=jenkins-trading-desk -ttl=5m -field=token); \
   for p in trading-desk/backend/prod/env trading-desk/frontend/prod/env trading-desk/other commerce-foundry/backend/prod/env; do \
     vault token capabilities "$T" "kv/data/$p"; done; vault token revoke "$T"'
+unset VAULT_TOKEN
 ```
+
+- AppRole 로그인 토큰은 10분(최대 30분)입니다. 파이프라인은 env 를 한 번 읽고 바로 `revoke-self` 합니다.
+- CIDR 바인딩(`secret_id_bound_cidrs`)은 걸지 않았습니다 — Vault 가 인그레스 nginx 뒤라 Vault 에는 출발지가 `.12` 로 보입니다.
+  거려면 Vault listener 의 `x_forwarded_for_authorized_addrs` 를 먼저 손봐야 하고 모든 프로젝트에 걸리는 변경이라 따로 다룹니다.
 
 secret-id 회전은 다른 프로젝트와 같이 `docker exec -it vault sh /vault/scripts/rotate-approle-secret.sh jenkins-trading-desk` 후
 Jenkins 폴더 `trading-desk` 의 `trading-desk-vault-secret-id` 를 교체합니다. 옛 secret-id 는 `secret_id_ttl="0"` 이라 저절로 만료되지 않으니,
