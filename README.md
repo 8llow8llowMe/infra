@@ -40,7 +40,7 @@ CPU · 메모리 · swap 은 `2026-08-14` 실측값입니다. 메모리는 `free
 | `192.168.0.12` storage | nginx, certbot, fail2ban, logrotate, minio, redis-node3 + sentinel3, web-ssr(tripmarble) |
 | `192.168.0.13` backend-1 | commerce-foundry **dev 백엔드 · 프론트**(예정. sneezecast 는 2026-10-30 배포 보류 — 설정은 유지), backend-dev2-agent · frontend-dev2-agent(env 준비, Jenkins 노드 생성 대기), redis-node2 + sentinel2 |
 | `192.168.0.14` deploy | grafana, prometheus, loki, promtail, node-exporter (2026-10-12 `docker ps` 실측), cloudflare-ddns(예정 — Cloudflare 로 옮긴 zone 부터, #59) |
-| `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10). 개인 도구 **trading-desk** 웹 · 백엔드 컨테이너(2026-11-04, Jenkins 없이 수동 배포) |
+| `192.168.0.9` backend-server | docker, backend-prod-agent, frontend-prod-agent — 각 프로젝트 **prod 백엔드**와 혼디가개 **prod 프론트** 배포 대상 (2026-10-10). 개인 도구 **trading-desk** 웹 · 백엔드 컨테이너(2026-11-04. 수동 배포. develop 머지 뒤 Jenkins 자동 배포 · Vault `kv/trading-desk` env 로 옮기는 중 — #70, 잡 · credential 등록 뒤) |
 
 **trading-desk(개인 도구, 2026-11-04, #68)** 는 `trading.8llow8llowme.com` → storage nginx → `192.168.0.9:10088`(웹 컨테이너) → 백엔드 컨테이너 → `.11` PostgreSQL(DB `trading_desk` · 계정 `trading_desk` · 스키마 `desk`). 사용자 1명이 쓰는 도구라 dev DB 인스턴스를 함께 쓰는 예외다(아래 4절 2번). 정기 백업이 없으므로 앱 저장소의 배포 문서대로 `pg_dump` 한다. 로그인 실패는 fail2ban `nginx-trading-login` 이 막는다.
 

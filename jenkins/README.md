@@ -352,3 +352,17 @@ deploy agent 도 각 서버에서 같은 방식으로 다시 빌드합니다.
 - Vault credential 은 폴더 범위(`vault/README.md` commerce-foundry 절). 전역 env `VAULT_ADDR` 를 이 프로젝트 때문에 추가했습니다.
 - 첫 배포는 이전 성공 빌드가 없어 자동 배포하지 않습니다 — 잡의 `develop` 에서 **Build with Parameters → `FORCE_DEPLOY=true`** 로
   service-discovery → api-gateway → auth → product · delivery → order · payment → storefront · admin 순서로 실행합니다.
+
+## trading-desk 잡 (#70, 2026-11-20 문서 — 잡 등록 전)
+
+- 개인 도구 trading-desk(앱 레포 `shindonggeun/trading-desk`, **공개**)도 위 agent 를 그대로 공유합니다. 새 agent 를 띄우지 않습니다.
+  - CI 대기: `builder` 라벨(ai-host-builder). 배포: 백엔드 `deploy-backend-prod`(backend-prod-agent), 웹 `deploy-frontend-prod`(frontend-prod-agent) — 둘 다 backend-server `.9`.
+  - 이미지는 deploy agent 가 그 호스트에서 빌드합니다(레지스트리 없음, 다른 프로젝트와 같음). 배포 lock 은 `trading-desk-prod-deploy` 하나(백엔드 · 웹이 차례로).
+- 폴더 `trading-desk` 아래 멀티브랜치 잡 2개 — `trading-desk-backend`(Script Path `Jenkinsfile-backend`) · `trading-desk-web`(Script Path `Jenkinsfile-web`).
+  - **develop 만**(Filter by name `develop`), **PR 발견 없음**(origin · fork 모두) — 공개 저장소라 fork 의 Jenkinsfile 이 운영 agent(docker 소켓)에서 돌면 안 됩니다.
+  - develop push 가 빌드를 띄워야 자동 배포가 됩니다. "Suppress automatic SCM triggering" 은 켜지 않습니다(켜야 하면 인덱싱에만). webhook 이 안 닿으면 주기 스캔 2분.
+  - 파이프라인이 GitHub Actions `ci` 성공을 기다린 뒤에만 배포하고, 확인이 실패하면 직전 이미지로 되돌립니다(앱 레포 `docs/deploy.md` 2절).
+- credential 은 폴더 범위 — `trading-desk-vault-role-id` · `trading-desk-vault-secret-id`(Secret text, `vault/README.md` trading-desk 절),
+  `trading-desk-github`(Username with password: fine-grained PAT, 그 저장소 Contents · Actions · Metadata 읽기만. 홈랩 GitHub App 을 설치할 수 있으면 그 App credential).
+  전역 env `VAULT_ADDR` 를 씁니다(commerce-foundry 때 추가).
+- 첫 배포는 develop 에서 **Build with Parameters → `FORCE_DEPLOY=true`** 로 백엔드 → 웹. 그다음 `ROLLBACK_DRILL=true` 로 되돌림을 한 번 시험합니다.
